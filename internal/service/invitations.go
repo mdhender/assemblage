@@ -69,10 +69,9 @@ type NewInvitation struct {
 // no route that could retrieve it -- which is why the transports show it once,
 // the way "asmdb bootstrap admin" shows a generated password once.
 //
-// It was a link until issue #3. The absolute URL was built for the redemption
-// page internal/web served, and with no page to land on a URL would be a
-// credential dressed up as somewhere to go. The administrator sends the token
-// and the recipient redeems it with earl.
+// A token and not a link: an absolute URL would name a route nothing answers,
+// which is a credential dressed up as somewhere to go. The administrator sends
+// the token and the recipient redeems it with earl.
 type CreatedInvitation struct {
 	Invitation domain.Invitation
 

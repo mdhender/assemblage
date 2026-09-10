@@ -21,8 +21,7 @@ inference from the code.
 
 Code comments cite "invariant N" (1–23). There is no master list in the repo;
 `grep -rn "invariant 8"` finds the places that state and enforce it. Invariant 23
-(autofill) no longer has code: it was the HTML UI's, and is now
-`docs/adrs/0001-autofill-policy-for-form-clients.md`.
+(autofill) has no code; it is `docs/adrs/0001-autofill-policy-for-form-clients.md`.
 
 **Names.** The commands are `asmd` (server), `asmdb` (database lifecycle), and
 `earl` (API client); the database file is always `assemblage.db`; the
@@ -66,9 +65,8 @@ Caddy is a machine-wide Homebrew service that already terminates TLS for
 yourself**; `deploy/Caddyfile.dev` is an example only. If it is not started, ask.
 
 That host name is **not** this application's and must not be renamed: it is the
-shared vhost for every Go + HTMX application on this laptop, and it kept the name
-after issue #3 removed the HTML UI. Renaming it means editing a Caddyfile several
-unrelated projects depend on.
+shared vhost for every Go + HTMX application on this laptop. Renaming it means
+editing a Caddyfile several unrelated projects depend on.
 
 ```sh
 mkdir -p var                                   # no command creates a directory
@@ -122,10 +120,9 @@ storage             internal/store    (SQL, zombiezen)
 - `store` holds **all** SQL and no business decisions.
 - `service` owns transactions, writes events, enqueues jobs. A use case lives here.
 - `api` parses a request, calls one service method, renders. It never touches
-  `store`. There was a second transport, `internal/web` (HTML/HTMX), removed in
-  issue #3; a transport is a *client* of the service, holding no state the API
-  lacks and permitting no operation it does not expose, and one added later
-  arrives with the test that says so.
+  `store`. A transport is a *client* of the service: it holds no state the API
+  lacks and permits no operation the API does not expose, and a second one added
+  beside it arrives with the test that says so.
 
 `workflow`, `authz`, `publish`, `jobs`, `events` sit beside `service`: logic too
 specific for `domain`, too reusable for one service method. `events` deliberately
@@ -202,8 +199,7 @@ From `AGENTS.md`:
 
 Other conventions: every Go file carries the `// Copyright (c) 2026 Michael D
 Henderson.` header (MIT); vendored third-party files keep their licence text
-beside them. Nothing is vendored today — the last was HTMX, which went with the
-UI in issue #3.
+beside them. Nothing is vendored today.
 
 `.env` files load through `internal/dotenv` in precedence order
 `.env.{env}.local`, `.env.local`, `.env.{env}`, `.env`; the `.local` files are

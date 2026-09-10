@@ -211,11 +211,10 @@ func (s *Service) PreviewOpen(name string) (fs.File, error) {
 // which is the difference between a 503 naming the flag that was not given and
 // a request worth attempting.
 //
-// The HTML UI asked it to decide whether to draw the button (issue #3). With
-// that gone the only caller is a test using it as a precondition, and it is
-// kept because the question is a real one about this service: a transport that
-// wants to say "not configured" ahead of time rather than after a failed
-// attempt has no other way to ask.
+// The only caller today is a test using it as a precondition. It is kept
+// because the question is a real one about this service: a transport that wants
+// to say "not configured" ahead of time, rather than after a failed attempt,
+// has no other way to ask.
 func (s *Service) PreviewConfigured() bool { return s.renderer != nil && s.preview != nil }
 
 // previewChannel resolves which output channel to render for.

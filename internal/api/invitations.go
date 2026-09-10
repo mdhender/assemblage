@@ -95,9 +95,9 @@ func newInvitationResponse(inv domain.Invitation, now time.Time) invitationRespo
 // sends it by hand; when there is one, this response stops being the only way
 // it reaches anybody and still does no harm.
 //
-// It carried an absolute "link" alongside the token until issue #3, for the
-// redemption page internal/web served. With that page gone the URL would name
-// a route nothing answers, so the response is the credential and nothing else.
+// It is the credential and nothing else. An absolute URL would name a route
+// nothing answers -- this server draws no pages -- which is a credential
+// dressed up as somewhere to go.
 type createdInvitationResponse struct {
 	Invitation invitationResponse `json:"invitation"`
 

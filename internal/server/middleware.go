@@ -129,8 +129,7 @@ func isTrusted(host string, trusted []*net.IPNet) bool {
 // authenticated by a bearer token (DESIGN.md 11).
 //
 // The protection reads Sec-Fetch-Site and Origin, so it defends anything a
-// browser can be made to send: the HTML UI, and any API route reached with the
-// session cookie. A request carrying a bearer token is exempt, because a
+// browser can be made to send: any route reached with the session cookie. A request carrying a bearer token is exempt, because a
 // browser does not attach one on its own -- there is no ambient credential to
 // abuse, which is the entire mechanism CSRF depends on.
 //

@@ -40,11 +40,11 @@ go run ./cmd/asmd serve --db ./var --addr 127.0.0.1:18443 --env development --ti
 needs the `asmdb init` line above once.
 
 Check it is up with <https://htmx-app.localhost:8443/healthz>. There is no page
-at the root: the HTML UI was removed in issue #3 and `asmd` serves the JSON API,
-the preview mount, and the job workers. Point `earl` at the same origin.
+at the root: `asmd` serves the JSON API, the preview mount, and the job workers.
+Point `earl` at the same origin.
 
 The host name is the shared vhost for every Go + HTMX application on this
-laptop, not a claim about this one, which is why it kept the name.
+laptop, not a claim about this one.
 
 When diagnosing local TLS, inspect the chain actually served on the wire and
 test with `/usr/bin/curl`; Homebrew's `openssl` and `curl` use their own CA

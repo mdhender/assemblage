@@ -158,10 +158,8 @@ func TestPreviewMountIsInTheTable(t *testing.T) {
 // answering to none of them is not a fourth kind; it is one nobody classified,
 // and it would print in no group at all.
 //
-// This is what is left of the test that held the HTML UI to the API's
-// operations (issue #3). With one transport there is nothing to hold in
-// parity, but the classification the grouping reads is still a thing that can
-// silently stop being true.
+// The classification the grouping reads is a thing that can silently stop being
+// true, which is why it is asserted rather than trusted.
 func TestEveryRouteIsClassified(t *testing.T) {
 	s := newTestServer(t, config.Production)
 

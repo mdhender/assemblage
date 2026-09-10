@@ -8,10 +8,9 @@
 // of either would be a second policy: two functions that disagree about what
 // "conflict" means, or a second cookie that is missing Secure (invariant 13).
 //
-// The HTML UI this package was extracted for is gone (issue #3), and it stays
-// because the second writer does: internal/api issues the session cookie and
-// internal/devroutes issues one too, so "one cookie-writing path" is still a
-// rule with something to enforce.
+// Two packages write the session cookie -- internal/api at login and
+// internal/devroutes at log-me-in -- so "one cookie-writing path" is a rule with
+// callers to hold.
 //
 // A sibling import would have been the other answer, and the design rejects it
 // for the same reason internal/reqctx exists: api, devroutes and server agree

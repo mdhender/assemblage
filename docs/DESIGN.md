@@ -111,18 +111,12 @@ logic lives in HTTP handlers, one client drifts from another and the two
 disagree about what is allowed. One service layer, one transport, and `earl` is
 a client of the API like anything else.
 
-**A transport is a client, not the application.** This was written when there
-were two — `internal/web` rendered HTML by calling the same service methods
-`internal/api` serialises to JSON, and a test held it to performing no operation
-`earl` could not. That UI was removed in issue #3 and assemblage is a content
-management server with a JSON API and nothing else.
-
-The rule outlives it, because it is the rule that made the removal cheap: the UI
-came out in an afternoon precisely because nothing had accumulated behind it.
-**A second transport added later holds no state the API does not have and
-permits no operation the API does not expose**, and it arrives with the test
-that says so. What that rule prevents is a second, accidental application
-growing inside a set of templates.
+**A transport is a client, not the application.** `internal/api` parses a
+request, calls one service method, and renders the answer. **A second transport
+added beside it holds no state the API does not have and permits no operation
+the API does not expose**, and it arrives with the test that says so. What that
+rule prevents is a second, accidental application growing inside a set of
+templates.
 
 This is also the structural fix for the worst bug in the Perl original: its
 permission check for moving a document between desks lived only in the template
@@ -198,13 +192,12 @@ disagree about what "conflict" means, or a second cookie that is missing
 `Secure` — and the alternative, a transport importing `api`, is the sibling
 dependency `reqctx` exists to avoid.
 
-It was extracted for the HTML UI removed in issue #3, and it stays because the
-second cookie writer does: `api` issues the session cookie at login and
-`devroutes` issues one at `log-me-in`, so "one cookie-writing path" is still a
-rule with two callers to hold. Both live in a leaf that imports the standard
-library, `domain`, and `config`, and holds nothing else. It renders nothing: the
-problem document is `api`'s, because RFC 9457 is the JSON API's contract. What
-is shared is the decision, not the presentation.
+Two packages write the session cookie — `api` at login and `devroutes` at
+`log-me-in` — so "one cookie-writing path" is a rule with callers to hold. Both
+things live in a leaf that imports the standard library, `domain`, and `config`,
+and holds nothing else. It renders nothing: the problem document is `api`'s,
+because RFC 9457 is the JSON API's contract. What is shared is the decision, not
+the presentation.
 
 `server` sits above the transports and holds no business logic. It exists
 because two things have nowhere else to live. The first is the route table:
@@ -1651,9 +1644,9 @@ Serves three things from one process:
 - `/preview/...` — rendered previews, authenticated and sandboxed (§8.4)
 - background job workers, unless `--workers 0`
 
-There is no fourth. An HTML UI was served at the root of the path space until
-issue #3; the root is now unrouted, and a browser pointed at it gets a 404 from
-the mux because nothing answers it.
+The root of the path space is unrouted. Nothing is registered at `GET /{$}`, so
+a browser pointed at the origin gets a 404 from the mux because nothing answers
+it.
 
 `--templates`, `--preview`, and `--output` name directories that must already
 exist, and none of the three roots is ever created (§8.3, §8.4, invariant 19).
@@ -1685,9 +1678,8 @@ model, not two.
 The development host name is not this application's. `htmx-app.localhost` is the
 shared vhost every Go + HTMX application on the development laptop is reached
 through — a machine-wide convenience that predates assemblage and has nothing to
-do with it, which is why it kept the name after the HTML UI was removed in issue
-#3. It is not a claim that this server serves HTMX, and renaming it would mean
-changing a Caddyfile several unrelated projects depend on.
+do with it. It is not a claim about what this server serves, and renaming it
+would mean changing a Caddyfile several unrelated projects depend on.
 
 The development proxy is that machine-wide Homebrew Caddy service, which reads
 `/opt/homebrew/etc/Caddyfile`. It issues a local certificate for `*.localhost`
@@ -2240,50 +2232,6 @@ same `refusals` list, so a client parses one shape whichever answer it gets.
 Requests carry `Idempotency-Key` on `POST`s that create jobs; store the key with
 the created resource and return the same result on replay.
 
-### There is no HTML UI
-
-`internal/web` served the same application at the root of the path space — `/`
-the dashboard, `/documents/{uid}` a page somebody could be sent a link to,
-`/login` the form — with `html/template` and a vendored HTMX runtime. It was
-removed in issue #3. Assemblage is a content management server: the JSON API is
-the whole of the HTTP surface a person's client talks to, and `earl` is the
-client this repository ships.
-
-The root of the path space is now unrouted. Nothing is registered at `GET /{$}`,
-so a browser pointed at the origin gets a 404 from the mux rather than a page,
-and `/static/` is gone with the stylesheet and the runtime it served.
-
-**What the removal cost, and what it did not.** It cost the one browser-reachable
-flow that genuinely had no other client: invitation redemption, where the person
-redeeming has no account and therefore no `earl` credentials. `POST
-/api/v1/invitations` now returns the token rather than an absolute link, and the
-administrator sends the token for the recipient to redeem with `earl invite
-redeem --token`. A link naming a route nothing answers would be a credential
-dressed up as somewhere to go.
-
-It cost nothing else, and that is the fact worth keeping. The UI was a client:
-it held no state the API lacked and performed no operation `earl` could not, and
-a test in `internal/server` held it to a table naming the API route behind every
-form it posted. Nothing had accumulated behind the templates, so removing them
-removed screens and not capability — no service method lost its only caller, no
-lower layer changed, and the API answers exactly what it answered before.
-
-**If a client is built again**, it is a client. It calls the service methods the
-JSON routes serialise, holds no state the API does not have, permits no
-operation the API does not expose, and arrives with the test that says so (§3).
-Two things it should read first:
-
-- `docs/adrs/0001-autofill-policy-for-form-clients.md` — the autofill policy
-  that was invariant 23, deny-by-default on every form control, kept because it
-  was learned from a real defect rather than derived from a principle.
-- §6.2, the action bar. `Available` and `Do` share one check, the bar is
-  `Available` rendered, and a refused move is drawn disabled with its reason and
-  the name of the guard that refused, never left out. A forged `POST` for one is
-  refused inside the transaction — a `409` when a guard or the state machine
-  refused, a `403` when the caller simply may not. That is the structural fix
-  for the worst bug in the Perl original (§3) and it is a property of the
-  engine, not of the UI that was removed: it holds for the JSON route today.
-
 ## 13. Persistence rules
 
 These are not suggestions. SQLite punishes casual concurrency, and it is
@@ -2496,9 +2444,7 @@ It governs:
 | Startup banner | prints the loud warning | prints `environment=production` |
 
 The template row is the content tree under `--templates`, which is edited by
-the people using the system. It is the only template tree the server has: the
-program's own screens were embedded in the binary and parsed once in both
-environments, and went with the UI in issue #3 (§12).
+the people using the system. It is the only template tree the server has.
 
 `production` is also the right value for staging and for CI. A third value was
 considered and rejected: more states mean more combinations nobody tests, and

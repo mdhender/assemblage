@@ -45,9 +45,6 @@ M0 ─▶ M1 ─▶ M2 ─▶ M3 ─▶ M4 ─▶ M5
                    └──▶ M6 ─▶ M7 ─▶ M8 ─▶ M9 ─▶ M10
 ```
 
-M13 hung off M10 and built the HTML UI. It was delivered and then removed in
-issue #3; the milestone is kept below as a record rather than as work.
-
 M11 (comments, approvals) and M12 (alerts) may proceed in parallel with the
 M7–M10 publishing chain once M4 lands. Everything else is a hard dependency.
 
@@ -699,60 +696,12 @@ sibling spelled — the same correction M6 made for jobs.
 
 ---
 
-## M13 — Web UI *(delivered, then removed)*
-
-**Goal.** Editors can do their job in a browser.
-
-Delivered as described below, and removed in issue #3: assemblage is a content
-management server, and the JSON API with `earl` is its whole client story. This
-section is kept because the acceptance criteria explain what the rest of the
-system still holds, and because two of them survived the removal.
-
-**Work.**
-- `internal/web`: `html/template`, HTMX, server-rendered partials.
-- Screens: queue list, document view, editor, version history and diff, desk
-  actions, comments, notifications, admin for workflows / roles / grants.
-- Every action button rendered from `workflow.Available`, showing refusal
-  reasons on disabled actions.
-- CSRF via `net/http.CrossOriginProtection`, with `server.public_origin`
-  registered as a trusted origin. It wraps cookie-authenticated routes;
-  bearer-token API routes are exempt, because a browser does not attach a
-  bearer token ambiguously.
-- Session cookie auth alongside bearer tokens.
-
-**Acceptance.**
-1. ~~No handler in `internal/web` calls `internal/store` directly.~~ The rule it
-   asserts is `DESIGN.md` §3 and applies to any transport; the test went with the
-   package.
-2. ~~The action bar on a document is generated from `Available`~~; **a manually
-   forged `POST` for a refused transition returns 409.** The second half is a
-   property of the engine, not of the UI, and is still asserted against the JSON
-   route (§6.2).
-3. **Still live**, in `internal/server/csrf_test.go`. A cross-origin write on a
-   cookie-authenticated route is rejected; the same request with the correct
-   `Origin` succeeds; a bearer-token request with no `Origin` at all succeeds.
-   The cookie outlived the UI — `internal/api` accepts it and `internal/devroutes`
-   issues one — so all three still have something to guard.
-4. ~~Every page renders with an empty database without panicking.~~
-5. ~~The UI performs no operation that `earl` cannot also perform.~~ This is the
-   criterion that made the removal an afternoon's work: nothing had accumulated
-   behind the templates, so deleting them removed screens and not capability.
-   `DESIGN.md` §3 keeps it as the rule a second transport would arrive under.
-
-**What it cost to remove.** One flow had no other client: invitation redemption,
-where the person redeeming has no account and so no `earl` credentials. `POST
-/api/v1/invitations` returns the token rather than an absolute link, and the
-administrator sends the token (M14 acceptance 1). The autofill policy that was
-invariant 23 moved to `docs/adrs/0001-autofill-policy-for-form-clients.md`.
-
----
-
 ## M14 — Invite-only registration and user lookup
 
 **Goal.** Somebody who is not already in the database can be given an account,
 and somebody who is can be found.
 
-This is issue #6 rather than a milestone from the original plan. M0–M13 built an
+This is issue #6 rather than a milestone from the original plan. M0–M12 built an
 editorial system for a cast of people the database already held: five identity
 routes, none of which creates a user, and one — `POST /users/{uid}/roles` —
 which needs a uid nothing could produce. `asmdb bootstrap admin` was the only
@@ -770,16 +719,13 @@ way in.
 - `internal/service`: the two administrative verbs, the redemption, and the user
   lookup, with `create` over the system subject for the first two and `read` for
   the last.
-- `internal/api`, `internal/web`, `earl`: the five API routes, the two
-  administrative screens, the public redemption page, and `earl invite` /
-  `earl user`. The screens and the redemption page went with the UI in issue #3;
-  the routes and the `earl` commands are what is left.
+- `internal/api` and `earl`: the five API routes, and `earl invite` /
+  `earl user`.
 
 **Acceptance.**
 1. On a database seeded with nothing but `asmdb bootstrap admin`, an
    administrator creates an invitation through `earl` and is shown the token
-   once. (It was a link, and both a UI path and a copy affordance, until issue
-   #3 removed the page it landed on.)
+   once.
 2. The token redeems exactly once, creating a user, with **no session issued**;
    they then sign in with the password they set.
 3. A second redemption fails; a wrong address fails; a redemption after 48 hours
@@ -795,9 +741,8 @@ way in.
    expired one, or forces one to expire.
 7. An administrator can find a user's uid without having kept the output of the
    command that created them, and can then assign a role.
-8. `earl` performs every operation the API offers. This was the mapping table
-   test in `internal/server` holding the UI to the API; with one transport it is
-   `earl`'s own end-to-end tests.
+8. `earl` performs every operation the API offers, which its own end-to-end
+   tests in `cmd/asmd` check.
 
 **Not in it.** Removing a role, deactivating an account, editing a profile
 (#7); e-mail (#4), so the administrator sends the token by hand; password reset
@@ -812,11 +757,9 @@ per attempt leaves volume as the only avenue, and nothing yet bounds volume.
 
 If scope must shrink, cut in this order, and say so in the release notes:
 
-1. ~~M13~~ — cut after the fact, in issue #3, for exactly the reason given here:
-   the API and `earl` are a usable product for a technical team.
-2. M12 — the event log still records everything; people just have to look.
-3. M10 — single-document publishing is useful; relatives are manual.
-4. M11 — approvals can be modelled as extra states in the interim.
+1. M12 — the event log still records everything; people just have to look.
+2. M10 — single-document publishing is useful; relatives are manual.
+3. M11 — approvals can be modelled as extra states in the interim.
 
 **Never cut:** the version-pinning behaviour in M9, the shared `check` in M4,
 the lease in M6, or the resource diff in M9. Those are the four things that make

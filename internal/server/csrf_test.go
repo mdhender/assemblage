@@ -21,12 +21,11 @@ import (
 // cookie-authenticated route is rejected, the same request with the correct
 // Origin succeeds, and a bearer-token request with no Origin at all succeeds.
 //
-// The cookie outlived the HTML UI it was built for (issue #3). internal/api
-// still accepts it, and the development log-me-in route still issues one so a
-// browser-driving agent can reach the preview mount without a bearer token --
-// so there is still an ambient credential here, and it still has to be
-// guarded. These tests drive the cookie against the API's own sign-out, which
-// is what a browser holding one would call.
+// internal/api accepts the session cookie and the development log-me-in route
+// issues one, so a browser-driving agent can reach the preview mount without a
+// bearer token. That is an ambient credential, and an ambient credential has to
+// be guarded. These tests drive the cookie against the API's own sign-out,
+// which is what a browser holding one would call.
 //
 // The protection is net/http.CrossOriginProtection, wrapped around the whole
 // mux in withCSRF and exempting a request that carries a bearer token

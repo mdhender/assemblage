@@ -106,6 +106,7 @@ we never asked it to fill.
 
 ## Where this came from
 
-`docs/DESIGN.md` §12 and `internal/web/autofill_test.go`, both removed in #3.
-Recover the originals from git history if the reasoning above ever needs its
-source.
+`internal/web/autofill_test.go` and the "Autocomplete is denied by default"
+passage of `docs/DESIGN.md` §12, both removed in #3. Recover the originals from
+git history if the reasoning above ever needs its source; nothing outside this
+file states the policy now.
