@@ -20,6 +20,7 @@ import (
 	"github.com/mdhender/assemblage/internal/buildenv"
 	"github.com/mdhender/assemblage/internal/config"
 	"github.com/mdhender/assemblage/internal/dotenv"
+	"github.com/mdhender/assemblage/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -83,6 +84,6 @@ func newRootCmd() *cobra.Command {
 // assemblage.db, so --db cannot address two different files depending on which
 // subcommand was typed (DESIGN.md 13.1).
 func addDBFlag(cmd *cobra.Command, dir *string) {
-	cmd.Flags().StringVar(dir, "db", "", "directory holding assemblage.db; it must already exist")
+	cmd.Flags().StringVar(dir, "db", "", fmt.Sprintf("directory holding %s; it must already exist", store.FileName))
 	_ = cmd.MarkFlagRequired("db")
 }

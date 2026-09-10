@@ -345,7 +345,8 @@ func newServeCmd(f *flags) *cobra.Command {
 	}
 	addServeFlags(cmd, f)
 	cmd.Flags().StringVar(&f.db, "db", "",
-		"directory holding assemblage.db; it must already exist, and asmd neither creates nor migrates it")
+		fmt.Sprintf("directory holding %s; it must already exist, and asmd neither creates nor migrates it",
+			store.FileName))
 	_ = cmd.MarkFlagRequired("db")
 	cmd.Flags().IntVar(&f.workers, "workers", jobs.DefaultWorkers,
 		"background job workers to run in this process; 0 disables them")

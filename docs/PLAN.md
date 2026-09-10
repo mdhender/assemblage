@@ -179,8 +179,9 @@ is about what these commands must refuse to do.
   user_version`, maintained by `sqlitemigration`. **No `schema_migrations` table
   and no hand-rolled version tracking.**
 - `internal/store`: two entry points and one shared name. - The database file
-  name is the unexported constant `assemblage.db`. Both entry points take a
-  **directory** path and join it. - `Create(dir)` — used only by `asmdb init`.
+  name is the constant `store.FileName`. Both entry points take a **directory**
+  path and join it, and callers use `store.Path(dir)` rather than joining it
+  themselves. - `Create(dir)` — used only by `asmdb init`.
   Fails if `dir` does not exist. **Never creates a directory.** Opens with
   explicit flags including `OpenCreate`, applies migrations, stamps the
   application ID. - `Open(dir)` — used by every other `asmdb` subcommand and by

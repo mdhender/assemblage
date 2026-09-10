@@ -5,7 +5,6 @@ package store
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/mdhender/assemblage/internal/migrate"
@@ -33,7 +32,7 @@ func TestCloseTruncatesTheWriteAheadLog(t *testing.T) {
 	fillWAL(t, db, 200)
 	readOnce(t, db)
 
-	wal := filepath.Join(dir, dbFileName+"-wal")
+	wal := Path(dir) + "-wal"
 	if before := sizeOf(t, wal); before <= 0 {
 		t.Fatalf("%s is %d bytes before the close; the test is not reproducing the condition", wal, before)
 	}
@@ -72,11 +71,11 @@ func TestTheDatabaseFileAloneIsCompleteAfterClose(t *testing.T) {
 	}
 
 	backup := t.TempDir()
-	copyFile(t, filepath.Join(dir, dbFileName), filepath.Join(backup, dbFileName))
+	copyFile(t, Path(dir), Path(backup))
 
 	restored, err := Open(t.Context(), backup, Options{})
 	if err != nil {
-		t.Fatalf("opening a copy of %s alone: %v", dbFileName, err)
+		t.Fatalf("opening a copy of %s alone: %v", FileName, err)
 	}
 	t.Cleanup(func() { _ = restored.Close() })
 

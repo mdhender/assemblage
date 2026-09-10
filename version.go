@@ -13,7 +13,7 @@ func Version() semver.Version {
 	return semver.Version{
 		Major:      0,
 		Minor:      2,
-		Patch:      0,
+		Patch:      1,
 		PreRelease: "alpha",
 		Build:      semver.Commit(),
 	}

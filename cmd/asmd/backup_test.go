@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mdhender/assemblage/internal/migrate"
+	"github.com/mdhender/assemblage/internal/store"
 )
 
 // TestBackupWhileTheServerIsRunning is #10 acceptance 1, at the level the
@@ -33,8 +34,8 @@ func TestBackupWhileTheServerIsRunning(t *testing.T) {
 	// Sessions, committed by the running server and still in its write-ahead
 	// log. A snapshot that read around the log would come back without them.
 	token := devLogins(t, proc, email, 25)
-	if n := walSize(t, filepath.Join(dir, "assemblage.db-wal")); n <= 0 {
-		t.Fatalf("assemblage.db-wal is %d bytes; the backup would not be proving anything", n)
+	if n := walSize(t, store.Path(dir)+"-wal"); n <= 0 {
+		t.Fatalf("%s-wal is %d bytes; the backup would not be proving anything", store.FileName, n)
 	}
 
 	backups := t.TempDir()
@@ -90,7 +91,7 @@ func TestBackupWhileTheServerIsRunning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(restored, "assemblage.db"), b, 0o600); err != nil {
+	if err := os.WriteFile(store.Path(restored), b, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	second := start(t, bin["asmd"], nil, "serve", "--db", restored,
@@ -114,7 +115,7 @@ func TestBackupRefusals(t *testing.T) {
 
 	t.Run("a missing directory names it and creates nothing", func(t *testing.T) {
 		missing := filepath.Join(backups, "nightly")
-		_, stderr, code := run(t, asmdb, nil, "backup", "--db", dir, "--to", filepath.Join(missing, "assemblage.db"))
+		_, stderr, code := run(t, asmdb, nil, "backup", "--db", dir, "--to", store.Path(missing))
 		if code == 0 {
 			t.Fatal("exited 0")
 		}
@@ -156,7 +157,7 @@ func TestBackupRefusals(t *testing.T) {
 
 	t.Run("a --db that is not ours is refused the usual way", func(t *testing.T) {
 		foreign := t.TempDir()
-		stampForeign(t, filepath.Join(foreign, "assemblage.db"), 0x41424344)
+		stampForeign(t, store.Path(foreign), 0x41424344)
 		_, stderr, code := run(t, asmdb, nil,
 			"backup", "--db", foreign, "--to", filepath.Join(backups, "foreign.db"))
 		if code == 0 {
@@ -197,7 +198,7 @@ func TestBackupAcrossAPendingMigration(t *testing.T) {
 	bin := buildCommands(t, t.TempDir())
 	asmdb := bin["asmdb"]
 	dir := initDB(t, asmdb)
-	db := filepath.Join(dir, "assemblage.db")
+	db := store.Path(dir)
 	backups := t.TempDir()
 
 	current := versionOf(t, db)

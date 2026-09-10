@@ -40,8 +40,8 @@ func TestAsmdb(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("init exited %d\nstderr: %s", code, stderr)
 		}
-		if _, err := os.Stat(filepath.Join(dir, "assemblage.db")); err != nil {
-			t.Fatalf("assemblage.db was not created: %v", err)
+		if _, err := os.Stat(store.Path(dir)); err != nil {
+			t.Fatalf("%s was not created: %v", store.FileName, err)
 		}
 		if !strings.Contains(stdout, "initialised") {
 			t.Errorf("init printed %q", stdout)
@@ -173,7 +173,7 @@ func TestAsmdRefusesToStart(t *testing.T) {
 			// Acceptance 10.
 			name:  "no assemblage.db in the directory",
 			setup: func(t *testing.T) string { return t.TempDir() },
-			want:  []string{"assemblage.db", "does not exist", "asmdb init"},
+			want:  []string{store.FileName, "does not exist", "asmdb init"},
 		},
 		{
 			// Acceptance 2, for asmd.
@@ -189,7 +189,7 @@ func TestAsmdRefusesToStart(t *testing.T) {
 			name: "a zero-length file",
 			setup: func(t *testing.T) string {
 				dir := t.TempDir()
-				if err := os.WriteFile(filepath.Join(dir, "assemblage.db"), nil, 0o600); err != nil {
+				if err := os.WriteFile(store.Path(dir), nil, 0o600); err != nil {
 					t.Fatal(err)
 				}
 				return dir
@@ -202,7 +202,7 @@ func TestAsmdRefusesToStart(t *testing.T) {
 			name: "another program's database",
 			setup: func(t *testing.T) string {
 				dir := t.TempDir()
-				stampForeign(t, filepath.Join(dir, "assemblage.db"), 0x4f544852)
+				stampForeign(t, store.Path(dir), 0x4f544852)
 				return dir
 			},
 			want: []string{"application_id", "0x4f544852", "0x41534d30"},
@@ -216,7 +216,7 @@ func TestAsmdRefusesToStart(t *testing.T) {
 				return dir
 			},
 			want: []string{
-				"assemblage.db",
+				store.FileName,
 				fmt.Sprintf("user_version is %d", migrate.Count()-1),
 				fmt.Sprintf("expected %d", migrate.Count()),
 				"asmdb migrate up",
@@ -230,11 +230,11 @@ func TestAsmdRefusesToStart(t *testing.T) {
 				if _, stderr, code := run(t, bin["asmdb"], nil, "init", "--db", dir); code != 0 {
 					t.Fatalf("init: %s", stderr)
 				}
-				setVersion(t, filepath.Join(dir, "assemblage.db"), int32(migrate.Count()+1))
+				setVersion(t, store.Path(dir), int32(migrate.Count()+1))
 				return dir
 			},
 			want: []string{
-				"assemblage.db",
+				store.FileName,
 				fmt.Sprintf("user_version is %d", migrate.Count()+1),
 				fmt.Sprintf("expected %d", migrate.Count()),
 			},
@@ -242,7 +242,7 @@ func TestAsmdRefusesToStart(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := tc.setup(t)
-			before := versionOf(t, filepath.Join(dir, "assemblage.db"))
+			before := versionOf(t, store.Path(dir))
 
 			_, stderr, code := run(t, bin["asmd"], nil,
 				"serve", "--db", dir, "--addr", addr, "--timeout", "5s")
@@ -263,7 +263,7 @@ func TestAsmdRefusesToStart(t *testing.T) {
 			}
 			// Acceptance 12: the version afterwards is untouched. A server
 			// that migrated and then failed for another reason must not pass.
-			if after := versionOf(t, filepath.Join(dir, "assemblage.db")); after != before {
+			if after := versionOf(t, store.Path(dir)); after != before {
 				t.Errorf("user_version went from %d to %d; asmd never migrates (invariant 20)", before, after)
 			}
 		})
@@ -313,11 +313,11 @@ func reservedAddr(t *testing.T) string {
 // only exercise "--to" gets at the process level.
 func initTo(t *testing.T, asmdb, dir string, n int) {
 	t.Helper()
-	stampEmpty(t, filepath.Join(dir, "assemblage.db"))
+	stampEmpty(t, store.Path(dir))
 	if _, stderr, code := run(t, asmdb, nil, "migrate", "up", "--db", dir, "--to", fmt.Sprint(n)); code != 0 {
 		t.Fatalf("migrate up --to %d: %s", n, stderr)
 	}
-	if got := versionOf(t, filepath.Join(dir, "assemblage.db")); got != int32(n) {
+	if got := versionOf(t, store.Path(dir)); got != int32(n) {
 		t.Fatalf("migrate up --to %d left user_version at %d", n, got)
 	}
 }
@@ -394,6 +394,11 @@ func versionOf(t *testing.T, path string) int32 {
 // TestPathIsTheDirectoryPlusTheConstant is DESIGN.md 13.1 as an assertion: --db
 // names a directory and the file inside it is always assemblage.db, so --db
 // cannot address two different files depending on which command was typed.
+//
+// This is the one place outside internal/store that spells the name out, and
+// it is the point of the test: everything else derives the path from
+// store.Path or the name from store.FileName, and this pins what they derive
+// it from. TestNothingElseSpellsTheDatabaseName exempts exactly this file.
 func TestPathIsTheDirectoryPlusTheConstant(t *testing.T) {
 	dir := t.TempDir()
 	if got, want := store.Path(dir), filepath.Join(dir, "assemblage.db"); got != want {

@@ -14,11 +14,17 @@ import (
 	"zombiezen.com/go/sqlite/sqlitex"
 )
 
-// dbFileName is the database inside the --db directory. It is a constant and
+// FileName is the database inside the --db directory. It is a constant and
 // not a flag, not a configuration key, and not a parameter, so that --db
 // cannot address two different files depending on which command was typed
 // (DESIGN.md 13.1).
-const dbFileName = "assemblage.db"
+//
+// It is exported for the one thing Path cannot serve: help text and messages
+// that name the file with no directory in hand. Nothing else should spell it
+// out -- a caller joining it to a directory itself wants Path, and a literal
+// somewhere else is a second answer to "what is the file called". A test in
+// this package fails on one.
+const FileName = "assemblage.db"
 
 // DefaultReadPoolSize is the number of reader connections. Readers are cheap
 // under WAL, where they do not block the writer and the writer does not block

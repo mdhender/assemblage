@@ -110,7 +110,7 @@ func (o Options) busyTimeout() time.Duration {
 
 // Path returns the database file inside dir. The file name is a constant, so
 // there is one answer per directory (DESIGN.md 13.1).
-func Path(dir string) string { return filepath.Join(dir, dbFileName) }
+func Path(dir string) string { return filepath.Join(dir, FileName) }
 
 // Exists reports whether dir holds a database. It returns a *DirError if dir
 // itself is missing or is not a directory.

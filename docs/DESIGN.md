@@ -2317,6 +2317,14 @@ The file name is a constant in `internal/store`. It is not a flag, not a
 configuration key, and not a parameter, so `--db` cannot address two different
 files depending on which command was typed.
 
+Nothing outside that package spells it out. A caller that wants a path calls
+`store.Path(dir)`; a caller that wants the name alone, for help text or a
+message, uses `store.FileName`. The rule is enforced by a test over the source
+tree, because a hand-rolled join is the kind of second answer that does not
+fail loudly — it writes a stray file beside the real one and passes. Two places
+are exempt and both are deliberate: the definition, and the one test that pins
+it to its value.
+
 **Nothing in this system ever creates a directory.** Not `asmdb`, not `asmd`,
 not a test helper, not a convenience wrapper. `os.Mkdir` and `os.MkdirAll` do
 not appear anywhere in the database path. A missing directory is a hard failure

@@ -20,8 +20,8 @@ func newInitCmd() *cobra.Command {
 	var dir string
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Create DIR/assemblage.db and apply every migration",
-		Long: "Create DIR/assemblage.db and apply every migration.\n\n" +
+		Short: fmt.Sprintf("Create DIR/%s and apply every migration", store.FileName),
+		Long: fmt.Sprintf("Create DIR/%s and apply every migration.\n\n", store.FileName) +
 			"DIR must already exist: nothing in this system creates a directory,\n" +
 			"because a mistyped path that creates one leaves an empty assemblage\n" +
 			"that looks exactly like the real one.",
@@ -141,7 +141,7 @@ func newCheckCmd() *cobra.Command {
 		Use:   "check",
 		Short: "Check integrity, foreign keys, leases, and orphaned resources",
 		Long: "Check integrity, foreign keys, leases, and orphaned resources.\n\n" +
-			"--db DIR checks DIR/assemblage.db, the database this system serves from.\n" +
+			fmt.Sprintf("--db DIR checks DIR/%s, the database this system serves from.\n", store.FileName) +
 			"--file FILE checks a database file under any name, which is what a\n" +
 			"backup is: verifying one used to mean moving it into a directory\n" +
 			"under the expected name first.",
@@ -253,7 +253,7 @@ func newCheckCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&dir, "db", "", "directory holding assemblage.db; it must already exist")
+	cmd.Flags().StringVar(&dir, "db", "", fmt.Sprintf("directory holding %s; it must already exist", store.FileName))
 	cmd.Flags().StringVar(&file, "file", "",
 		"database file to check under any name, such as a backup; read-only")
 	cmd.MarkFlagsMutuallyExclusive("db", "file")

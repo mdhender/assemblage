@@ -34,8 +34,8 @@ func TestBackupWritesAVerifiedSnapshot(t *testing.T) {
 	const rows = 200
 	fillWAL(t, db, rows)
 	readOnce(t, db)
-	if n := sizeOf(t, filepath.Join(dir, dbFileName+"-wal")); n <= 0 {
-		t.Fatalf("assemblage.db-wal is %d bytes; the snapshot would not be proving anything", n)
+	if n := sizeOf(t, Path(dir)+"-wal"); n <= 0 {
+		t.Fatalf("%s-wal is %d bytes; the snapshot would not be proving anything", FileName, n)
 	}
 
 	to := filepath.Join(t.TempDir(), "assemblage-2026-09-09.db")
@@ -150,7 +150,7 @@ func TestBackupCreatesNoDirectory(t *testing.T) {
 	db, dir := fileStore(t)
 	missing := filepath.Join(dir, "backups")
 
-	_, err := db.Backup(t.Context(), filepath.Join(missing, "assemblage.db"), BackupOptions{Now: time.Now().UTC()})
+	_, err := db.Backup(t.Context(), Path(missing), BackupOptions{Now: time.Now().UTC()})
 	var dirErr *DirError
 	if !errors.As(err, &dirErr) {
 		t.Fatalf("Backup into a missing directory = %v, want a *DirError", err)
@@ -168,7 +168,7 @@ func TestBackupCreatesNoDirectory(t *testing.T) {
 func TestBackupRefusesTheDatabaseItself(t *testing.T) {
 	db, dir := fileStore(t)
 	fillWAL(t, db, 20)
-	source := filepath.Join(dir, dbFileName)
+	source := Path(dir)
 	before := sizeOf(t, source)
 
 	if _, err := db.Backup(t.Context(), source, BackupOptions{Overwrite: true, Now: time.Now().UTC()}); err == nil {
@@ -217,7 +217,7 @@ func TestARestoredBackupOpens(t *testing.T) {
 	}
 
 	restored := t.TempDir()
-	copyFile(t, to, filepath.Join(restored, dbFileName))
+	copyFile(t, to, Path(restored))
 	rdb, err := Open(t.Context(), restored, Options{})
 	if err != nil {
 		t.Fatalf("opening a restored backup: %v", err)
@@ -407,7 +407,7 @@ func TestCheckFileReadsAnOlderBackup(t *testing.T) {
 // refused whatever is being done to it.
 func TestAnyVersionStillRefusesAnotherSystemsDatabase(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, dbFileName)
+	path := Path(dir)
 
 	conn, err := sqlite.OpenConn(path, sqlite.OpenReadWrite|sqlite.OpenCreate|sqlite.OpenWAL)
 	if err != nil {

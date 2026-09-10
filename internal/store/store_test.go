@@ -30,7 +30,7 @@ func TestCreate(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	if want := filepath.Join(dir, "assemblage.db"); db.Path() != want {
+	if want := Path(dir); db.Path() != want {
 		t.Errorf("Path() = %q, want %q; the file name is a constant", db.Path(), want)
 	}
 	if _, err := os.Stat(db.Path()); err != nil {

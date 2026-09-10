@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mdhender/assemblage/internal/migrate"
+	"github.com/mdhender/assemblage/internal/store"
 )
 
 // These are #11 at the process level: a graceful shutdown left
@@ -67,7 +67,7 @@ func TestAGracefulShutdownCheckpointsTheWriteAheadLog(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			const email, password = "admin@example.com", "correct horse battery staple"
 			dir := bootstrapped(t, bin["asmdb"], email, password)
-			wal := filepath.Join(dir, "assemblage.db-wal")
+			wal := store.Path(dir) + "-wal"
 
 			proc := start(t, bin["asmd"], nil, "serve", "--db", dir,
 				"--env", "development", "--addr", "127.0.0.1:0", "--timeout", tc.timeout)
@@ -77,7 +77,8 @@ func TestAGracefulShutdownCheckpointsTheWriteAheadLog(t *testing.T) {
 			// would pass this test without the fix.
 			token := devLogins(t, proc, email, 25)
 			if before := walSize(t, wal); before <= 0 {
-				t.Fatalf("assemblage.db-wal is %d bytes while the server is running; the test is not reproducing the condition", before)
+				t.Fatalf("%s-wal is %d bytes while the server is running; the test is not reproducing the condition",
+					store.FileName, before)
 			}
 
 			if tc.stop != nil {
@@ -89,7 +90,8 @@ func TestAGracefulShutdownCheckpointsTheWriteAheadLog(t *testing.T) {
 
 			// Acceptance 1: the log is gone or empty.
 			if got := walSize(t, wal); got > 0 {
-				t.Errorf("assemblage.db-wal is %d bytes after a graceful shutdown, want absent or empty\nstderr: %s",
+				t.Errorf("%s-wal is %d bytes after a graceful shutdown, want absent or empty\nstderr: %s",
+					store.FileName,
 					got, proc.stderr())
 			}
 
@@ -127,7 +129,7 @@ func TestAKilledServerLeavesARecoverableDatabase(t *testing.T) {
 
 	const email, password = "admin@example.com", "correct horse battery staple"
 	dir := bootstrapped(t, bin["asmdb"], email, password)
-	wal := filepath.Join(dir, "assemblage.db-wal")
+	wal := store.Path(dir) + "-wal"
 
 	proc := start(t, bin["asmd"], nil, "serve", "--db", dir,
 		"--env", "development", "--addr", "127.0.0.1:0", "--timeout", "120s")
@@ -143,7 +145,7 @@ func TestAKilledServerLeavesARecoverableDatabase(t *testing.T) {
 	// The log survives, which is the whole point: it is the only copy of
 	// those commits, and nothing has had a chance to move them.
 	if got := walSize(t, wal); got <= 0 {
-		t.Fatalf("assemblage.db-wal is %d bytes after SIGKILL, want the log left for the next open to replay", got)
+		t.Fatalf("%s-wal is %d bytes after SIGKILL, want the log left for the next open to replay", store.FileName, got)
 	}
 
 	// And the next opener recovers it. This one is the real database rather than a
@@ -164,9 +166,9 @@ func TestEveryasmdbCommandCheckpointsOnItsWayOut(t *testing.T) {
 	asmdb := bin["asmdb"]
 
 	dir := initDB(t, asmdb)
-	wal := filepath.Join(dir, "assemblage.db-wal")
+	wal := store.Path(dir) + "-wal"
 	if got := walSize(t, wal); got > 0 {
-		t.Errorf("asmdb init left a %d-byte assemblage.db-wal", got)
+		t.Errorf("asmdb init left a %d-byte %s-wal", got, store.FileName)
 	}
 
 	// In the order the commands themselves require: seed writes the roles
@@ -189,7 +191,7 @@ func TestEveryasmdbCommandCheckpointsOnItsWayOut(t *testing.T) {
 				t.Fatalf("asmdb %s exited %d\nstdout: %s\nstderr: %s", tc.name, code, stdout, stderr)
 			}
 			if got := walSize(t, wal); got > 0 {
-				t.Errorf("asmdb %s left a %d-byte assemblage.db-wal, want absent or empty", tc.name, got)
+				t.Errorf("asmdb %s left a %d-byte %s-wal, want absent or empty", tc.name, got, store.FileName)
 			}
 		})
 	}
@@ -225,11 +227,11 @@ func devLogins(t *testing.T, p *process, email string, n int) string {
 func backupOf(t *testing.T, dir string) string {
 	t.Helper()
 	backup := t.TempDir()
-	b, err := os.ReadFile(filepath.Join(dir, "assemblage.db"))
+	b, err := os.ReadFile(store.Path(dir))
 	if err != nil {
-		t.Fatalf("reading assemblage.db: %v", err)
+		t.Fatalf("reading %s: %v", store.FileName, err)
 	}
-	if err := os.WriteFile(filepath.Join(backup, "assemblage.db"), b, 0o600); err != nil {
+	if err := os.WriteFile(store.Path(backup), b, 0o600); err != nil {
 		t.Fatalf("writing the copy: %v", err)
 	}
 	return backup
