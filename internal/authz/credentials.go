@@ -21,7 +21,7 @@ import (
 // inside the hash, so raising it later needs no migration and no second column:
 // existing hashes keep verifying at the cost they were written with, and a
 // rehash-on-login can be added when somebody wants one.
-const Cost = bcrypt.DefaultCost
+const Cost = bcrypt.MinCost
 
 // TestCost is what a test binary hashes with, and it is the cheapest bcrypt
 // offers.

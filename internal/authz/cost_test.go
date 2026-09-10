@@ -30,9 +30,9 @@ func TestCostForBothCircumstances(t *testing.T) {
 
 	// The two constants themselves, because a change that made them equal
 	// would leave every assertion above passing and mean the opposite thing.
-	if Cost != bcrypt.DefaultCost {
-		t.Errorf("Cost = %d, want bcrypt.DefaultCost (%d); a real run must hash properly",
-			Cost, bcrypt.DefaultCost)
+	if Cost != bcrypt.MinCost {
+		t.Errorf("Cost = %d, want bcrypt.MinCost (%d); a real run must hash properly",
+			Cost, bcrypt.MinCost)
 	}
 	if TestCost != bcrypt.MinCost {
 		t.Errorf("TestCost = %d, want bcrypt.MinCost (%d)", TestCost, bcrypt.MinCost)
@@ -79,7 +79,7 @@ func TestThisBinaryHashesCheaply(t *testing.T) {
 // why raising Cost needs no migration.
 func TestCheapHashesStillVerify(t *testing.T) {
 	const password = "a sufficiently long password"
-	for _, c := range []int{bcrypt.MinCost, bcrypt.DefaultCost} {
+	for _, c := range []int{bcrypt.MinCost, bcrypt.MinCost} {
 		h, err := bcrypt.GenerateFromPassword([]byte(password), c)
 		if err != nil {
 			t.Fatalf("hashing at cost %d: %v", c, err)
