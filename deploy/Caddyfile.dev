@@ -1,0 +1,47 @@
+# EXAMPLE ONLY — DO NOT RUN THIS FILE.
+#
+# This is documentation of the development reverse proxy, not a configuration
+# anyone loads. Caddy runs as a machine-wide Homebrew service that reads
+# /opt/homebrew/etc/Caddyfile, and that config already terminates TLS for
+# https://htmx-app.localhost:8443 and proxies it to 127.0.0.1:18443.
+#
+# Do NOT run `caddy run --config deploy/Caddyfile.dev`, or any other
+# `caddy run` / `caddy start` / `caddy trust`. The service runs with
+# HOME=/opt/homebrew/var/lib and keeps its internal CA in
+# /opt/homebrew/var/lib/caddy/pki/. Running caddy as your own user account uses
+# ~/Library/Application Support/Caddy/pki/ instead and mints a SECOND CA root
+# with the same subject name, then trusts it. Two same-subject anchors make
+# certificate chain building non-deterministic: HTTPS to *.localhost:8443 fails
+# at random and clearing it needs sudo keychain surgery.
+#
+# What the model documented here is: Caddy terminates TLS so development
+# matches production — asmd speaks plain HTTP on loopback and never handles
+# certificates. Browsers resolve *.localhost to loopback without an /etc/hosts
+# entry.
+#
+# To run locally, start only asmd:
+#
+#   brew services list | grep caddy    # expect "started"; if not, ask a human
+#   go run ./cmd/asmd serve --db ./var --addr 127.0.0.1:18443 \
+#       --env development --timeout 60m
+#
+# Then open https://htmx-app.localhost:8443/
+
+{
+	# Keep Caddy's own admin API off a predictable port during development.
+	admin off
+}
+
+htmx-app.localhost:8443 {
+	# reverse_proxy sets X-Forwarded-For, X-Forwarded-Proto and
+	# X-Forwarded-Host, and passes Origin and Sec-Fetch-* through unmodified.
+	# asmd trusts these only from 127.0.0.1 — see server.trusted_proxies.
+	reverse_proxy 127.0.0.1:18443
+
+	encode gzip
+
+	log {
+		output stderr
+		format console
+	}
+}
