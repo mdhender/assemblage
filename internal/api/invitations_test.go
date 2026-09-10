@@ -44,7 +44,7 @@ func (h *harness) redeem(t *testing.T, body map[string]string) *httptest.Respons
 }
 
 // TestInvitationRoundTrip is the first three acceptance criteria: an
-// administrator invites an address, the link redeems exactly once, and no
+// administrator invites an address, the token redeems exactly once, and no
 // session comes of it.
 func TestInvitationRoundTrip(t *testing.T) {
 	h := newHarness(t)
@@ -53,10 +53,7 @@ func TestInvitationRoundTrip(t *testing.T) {
 
 	created := h.invite(t, admin, "rose@example.com")
 	if created.Token == "" {
-		t.Fatal("the response carried no token; the link is returned once and this was the once")
-	}
-	if created.Link == "" || created.Link[0] == '/' {
-		t.Errorf("link = %q, want an absolute URL somebody can be sent", created.Link)
+		t.Fatal("the response carried no token; it is returned once and this was the once")
 	}
 	if created.Invitation.Status != string(domain.InvitationPending) {
 		t.Errorf("status = %q, want pending", created.Invitation.Status)
@@ -65,7 +62,7 @@ func TestInvitationRoundTrip(t *testing.T) {
 		t.Error("a new invitation is not redeemable")
 	}
 
-	// Reading it back never shows the link again, because what is stored is a
+	// Reading it back never shows the token again, because what is stored is a
 	// hash and there is nothing to show.
 	w := h.do(t, http.MethodGet, "/api/v1/invitations/"+created.Invitation.UID, admin, nil)
 	if w.Code != http.StatusOK {
@@ -250,13 +247,13 @@ func TestReinvitingSupersedes(t *testing.T) {
 		t.Errorf("status = %q, want superseded", inv.Status)
 	}
 
-	// And the old link is dead at once, rather than at whatever its expiry
+	// And the old token is dead at once, rather than at whatever its expiry
 	// said.
 	if w := h.redeem(t, map[string]string{
 		"token": first.Token, "email": "twice@example.com",
 		"name": "Too Late", "password": password,
 	}); w.Code == http.StatusCreated {
-		t.Error("the superseded link still redeems")
+		t.Error("the superseded token still redeems")
 	}
 
 	// The new one works.
@@ -264,7 +261,7 @@ func TestReinvitingSupersedes(t *testing.T) {
 		"token": second.Token, "email": "twice@example.com",
 		"name": "In Time", "password": password,
 	}); w.Code != http.StatusCreated {
-		t.Errorf("the replacement link does not redeem: %d %s", w.Code, w.Body)
+		t.Errorf("the replacement token does not redeem: %d %s", w.Code, w.Body)
 	}
 }
 

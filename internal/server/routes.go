@@ -9,10 +9,9 @@ import (
 	"strings"
 
 	"github.com/mdhender/assemblage/internal/api"
+	"github.com/mdhender/assemblage/internal/devroutes"
 	"github.com/mdhender/assemblage/internal/edge"
 	"github.com/mdhender/assemblage/internal/render"
-	"github.com/mdhender/assemblage/internal/web"
-	"github.com/mdhender/assemblage/internal/web/devroutes"
 )
 
 // Route is one entry in the table "asmd routes" prints.
@@ -42,10 +41,11 @@ func (r Route) IsPreview() bool {
 	return strings.Contains(r.Pattern, render.PreviewPrefix)
 }
 
-// IsUI reports whether this route is one of the HTML UI's. The three
-// predicates are what "asmd routes" groups the table by, and a route that
-// answered to none of them would be one nobody had classified.
-func (r Route) IsUI() bool {
+// IsUnclassified reports whether this route answers to none of the predicates
+// above. The three are what "asmd routes" groups the table by, and a route that
+// answered to none of them would be one nobody had classified -- which is a
+// mistake rather than a category, so a test fails on it.
+func (r Route) IsUnclassified() bool {
 	return !r.IsAPI() && !r.IsDevelopment() && !r.IsPreview() && r.Pattern != "GET /healthz"
 }
 
@@ -106,24 +106,6 @@ func (s *Server) buildRoutes() (*http.ServeMux, []Route) {
 		// somebody looking for a typo in the path.
 		b.note = "preview"
 		api.RegisterPreview(b, deps)
-
-		// The HTML UI (PLAN.md M13). It is registered beside the API and
-		// under the same condition, because it is a second face on one
-		// application: the pages call the service methods the JSON routes
-		// serialise, and a server with a database has both or neither.
-		//
-		// Its routes sit at the root of the path space rather than under a
-		// prefix, which is what makes "/" the dashboard and "/documents/{uid}"
-		// a page somebody can be sent a link to. Nothing here is a catch-all:
-		// the UI registers "GET /{$}" and the paths it declares, so an
-		// unregistered path is still a 404 from the mux.
-		b.note = "html ui"
-		web.Register(b, web.Deps{
-			Service:     s.svc,
-			Environment: s.env,
-			Origin:      s.origin,
-			Logger:      s.log,
-		})
 		b.note = ""
 	}
 

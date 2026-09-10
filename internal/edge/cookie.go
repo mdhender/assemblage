@@ -21,8 +21,8 @@ import (
 // same thing: it rejects the cookie outright unless it is Secure, has no
 // Domain, and has Path=/. A mistake here fails visibly rather than silently.
 //
-// Three callers write a session: the JSON API's login, the HTML UI's login,
-// and the development log-me-in route. A session any of them issues is an
+// Two callers write a session: the JSON API's login and the development
+// log-me-in route. A session any of them issues is an
 // ordinary session, so it gets an ordinary cookie, and there is one function
 // that says what that means. A second one is where the Secure flag goes
 // missing.

@@ -20,7 +20,7 @@ import (
 )
 
 // devLoginPath is the development login route (DESIGN.md 11). It is written
-// out here rather than imported from internal/web/devroutes because earl is a
+// out here rather than imported from internal/devroutes because earl is a
 // client: it knows the API's URLs the way any other client does, and a client
 // that imports the server's route constants is a client that cannot be pointed
 // at a different build.

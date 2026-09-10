@@ -10,9 +10,9 @@
 // trusted proxy (invariant 14), and a second parse somewhere downstream is a
 // second policy that can disagree with the first.
 //
-// It is a leaf. internal/api, internal/web, internal/web/devroutes and
-// internal/server all read from it, and it imports nothing but the standard
-// library and internal/domain, so none of them has to import another.
+// It is a leaf. internal/api, internal/devroutes and internal/server all read
+// from it, and it imports nothing but the standard library and internal/domain,
+// so none of them has to import another.
 //
 // Permitted imports: the standard library, internal/domain.
 package reqctx

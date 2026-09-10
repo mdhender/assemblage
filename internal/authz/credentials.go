@@ -28,7 +28,7 @@ const Cost = bcrypt.MinCost
 //
 // Password hashing was roughly half of "make check": at Cost the suite ran 3:39
 // and burned 436s of CPU, at TestCost 1:55 and 167s. internal/service fell 84%,
-// internal/api 88%, internal/web 77%, while internal/store and internal/workflow
+// internal/api 88%, while internal/store and internal/workflow
 // -- which hash nothing -- did not move. No test in this repository asserts
 // anything about how long a hash takes, so all of that was waste.
 const TestCost = bcrypt.MinCost

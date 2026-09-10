@@ -25,6 +25,12 @@ Every guard, effect, privilege and status code in it is drawn from the code and
 from the workflow seeded by `internal/migrate/schema/0001_initial.sql`. The
 times, the names and the story are invented.
 
+It was written while `internal/web` served the screens it describes, and that UI
+was removed in issue #3. The engine it walks through is unchanged — the greyed
+action bar is `workflow.Available`, which `GET /documents/{uid}/transitions`
+still returns with a reason on every refused move — but the six people would be
+driving `earl` today, not a browser.
+
 The page is public: the link above resolves for anyone who has it, with no
 Claude account needed. Treat it as published — it is a reasonable thing to
 hand to somebody evaluating the system, and a poor place to put anything this

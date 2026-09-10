@@ -377,8 +377,9 @@ func (s *Service) Resources(ctx context.Context, actor domain.Identity, uid stri
 	return view, resources, nil
 }
 
-// PublishConfigured reports whether this server can publish at all. It is what
-// the startup banner and the log line ask.
+// PublishConfigured reports whether this server can publish at all. See
+// PreviewConfigured, which is the same question about the other half of the
+// rendering pipeline and carries the note about why both are still here.
 func (s *Service) PublishConfigured() bool { return s.publisher != nil }
 
 // publishableState refuses a document whose workflow does not call its current

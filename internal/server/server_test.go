@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/mdhender/assemblage/internal/config"
-	"github.com/mdhender/assemblage/internal/web/devroutes"
+	"github.com/mdhender/assemblage/internal/devroutes"
 )
 
 // listen gives the test a real loopback listener on an arbitrary port, so the

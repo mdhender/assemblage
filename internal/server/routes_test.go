@@ -5,13 +5,12 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mdhender/assemblage/internal/config"
+	"github.com/mdhender/assemblage/internal/devroutes"
 	"github.com/mdhender/assemblage/internal/render"
-	"github.com/mdhender/assemblage/internal/web/devroutes"
 )
 
 func newTestServer(t *testing.T, env config.Environment) *Server {
@@ -93,13 +92,10 @@ func TestRouteTableTellsTheTruth(t *testing.T) {
 			t.Errorf("pattern %q has no method; ServeMux patterns here are method-aware", r.Pattern)
 			continue
 		}
-		// Two wildcards have to be filled in rather than sent literally.
-		// "{$}" is an end-of-path marker and not a segment, and "{file}" is
-		// matched by a handler that answers 404 for a file it does not have --
-		// which is a handler answering, not the mux failing to route. Every
-		// other wildcard is happy to match its own name.
+		// "{$}" is an end-of-path marker rather than a segment, so it is
+		// dropped instead of sent literally. Every other wildcard is happy to
+		// match its own name.
 		path = strings.ReplaceAll(path, "{$}", "")
-		path = strings.ReplaceAll(path, "{file}", "app.css")
 
 		req := httptest.NewRequest(method, path, nil)
 		req.RemoteAddr = "127.0.0.1:12345"
@@ -155,105 +151,33 @@ func TestPreviewMountIsInTheTable(t *testing.T) {
 	}
 }
 
-// TestUIPerformsNothingEarlCannot is PLAN.md M13 acceptance 5.
+// TestEveryRouteIsClassified holds the route table's grouping honest.
 //
-// Every write the HTML UI offers is one the JSON API offers too, so every
-// screen is something earl can drive -- which is what makes the UI a second
-// face on one application rather than a second application. A use case that
-// existed only behind a form would be a use case that escaped the service
-// layer and could not be scripted, tested from the command line, or exercised
-// by the acceptance harness every milestone ships with.
+// "asmd routes" prints the table in three groups -- the JSON API, the preview
+// mount, and the development affordances -- plus the liveness probe. A route
+// answering to none of them is not a fourth kind; it is one nobody classified,
+// and it would print in no group at all.
 //
-// The table is checked in both directions. A UI route with no counterpart is
-// the failure the acceptance criterion names; a UI route missing from the
-// table is the way that failure would arrive unnoticed.
-func TestUIPerformsNothingEarlCannot(t *testing.T) {
-	// The UI spells with POST what the API spells with DELETE or PUT, because
-	// an HTML form may only GET or POST. What has to match is the operation,
-	// not the method.
-	counterpart := map[string]string{
-		"POST /login":                              "POST /api/v1/sessions",
-		"POST /logout":                             "DELETE /api/v1/sessions/current",
-		"POST /documents":                          "POST /api/v1/documents",
-		"POST /documents/{uid}/edit":               "PATCH /api/v1/documents/{uid}",
-		"POST /documents/{uid}/checkout":           "POST /api/v1/documents/{uid}/checkout",
-		"POST /documents/{uid}/checkout/cancel":    "DELETE /api/v1/documents/{uid}/checkout",
-		"POST /documents/{uid}/checkin":            "POST /api/v1/documents/{uid}/checkin",
-		"POST /documents/{uid}/revert":             "POST /api/v1/documents/{uid}/revert",
-		"POST /documents/{uid}/transitions":        "POST /api/v1/documents/{uid}/transitions",
-		"POST /documents/{uid}/assignment":         "POST /api/v1/documents/{uid}/assignment",
-		"POST /documents/{uid}/assignment/clear":   "DELETE /api/v1/documents/{uid}/assignment",
-		"POST /documents/{uid}/due":                "PUT /api/v1/documents/{uid}/due",
-		"POST /documents/{uid}/categories":         "PUT /api/v1/documents/{uid}/categories",
-		"POST /documents/{uid}/comments":           "POST /api/v1/documents/{uid}/comments",
-		"POST /comments/{uid}/resolution":          "POST /api/v1/comments/{uid}/resolution",
-		"POST /documents/{uid}/approvals":          "POST /api/v1/documents/{uid}/approvals",
-		"POST /documents/{uid}/approvals/withdraw": "DELETE /api/v1/documents/{uid}/approvals/current",
-		"POST /documents/{uid}/preview":            "POST /api/v1/documents/{uid}/preview",
-		"POST /documents/{uid}/publications":       "POST /api/v1/documents/{uid}/publications",
-		"POST /notifications/{uid}/read":           "POST /api/v1/notifications/{uid}/read",
-		"POST /jobs/{uid}/retry":                   "POST /api/v1/jobs/{uid}/retry",
-		"POST /admin/grants":                       "POST /api/v1/grants",
-		"POST /admin/roles":                        "POST /api/v1/users/{uid}/roles",
-
-		// Invitations (issue #6). The revocation is the one operation whose
-		// two spellings are identical, which is deliberate: no invitation row
-		// is ever deleted, so a DELETE would be the one DELETE in the API that
-		// does not delete, and the form could not spell it anyway.
-		"POST /admin/invitations":              "POST /api/v1/invitations",
-		"POST /admin/invitations/{uid}/revoke": "POST /api/v1/invitations/{uid}/revoke",
-		"POST /invite":                         "POST /api/v1/invitations/redemption",
-	}
-
-	s := newTestServer(t, config.Production)
-	declared := map[string]bool{}
-	for _, r := range s.Routes() {
-		declared[r.Pattern] = true
-	}
-
-	for _, r := range s.Routes() {
-		if !r.IsUI() || !strings.HasPrefix(r.Pattern, "POST ") {
-			continue
-		}
-		api, ok := counterpart[r.Pattern]
-		if !ok {
-			t.Errorf("%s writes something and this table does not say which API route does the same; either name it or the UI has grown an operation earl cannot perform (PLAN.md M13 acceptance 5)", r.Pattern)
-			continue
-		}
-		if !declared[api] {
-			t.Errorf("%s is answered by %s, which this server does not register", r.Pattern, api)
-		}
-	}
-
-	// The other direction: a mapping left behind after its screen was removed
-	// would quietly stop asserting anything.
-	for pattern := range counterpart {
-		if !declared[pattern] {
-			t.Errorf("the table names %s, which the UI does not register", pattern)
-		}
-	}
-}
-
-// TestUIRoutesAreRegisteredBesideTheAPI asserts that the HTML UI is in the
-// table "asmd routes" prints, and that none of it landed under the API prefix
-// or the development prefix.
-func TestUIRoutesAreRegisteredBesideTheAPI(t *testing.T) {
+// This is what is left of the test that held the HTML UI to the API's
+// operations (issue #3). With one transport there is nothing to hold in
+// parity, but the classification the grouping reads is still a thing that can
+// silently stop being true.
+func TestEveryRouteIsClassified(t *testing.T) {
 	s := newTestServer(t, config.Production)
 
-	var ui int
 	for _, r := range s.Routes() {
-		if !r.IsUI() {
-			continue
+		if r.IsUnclassified() {
+			t.Errorf("%s answers to none of IsAPI, IsPreview or IsDevelopment, so \"asmd routes\" prints it in no group", r.Pattern)
 		}
-		ui++
-		if r.IsAPI() || r.IsDevelopment() || r.IsPreview() {
+
+		var kinds int
+		for _, in := range []bool{r.IsAPI(), r.IsPreview(), r.IsDevelopment()} {
+			if in {
+				kinds++
+			}
+		}
+		if kinds > 1 {
 			t.Errorf("%s is classified as more than one kind of route", r.Pattern)
 		}
-	}
-	if ui == 0 {
-		t.Fatal("the table carries no HTML UI routes")
-	}
-	if !slices.ContainsFunc(s.Routes(), func(r Route) bool { return r.Pattern == "GET /{$}" }) {
-		t.Error("the dashboard is not registered at \"GET /{$}\"; a catch-all \"GET /\" would answer every mistyped path with a page")
 	}
 }

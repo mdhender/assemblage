@@ -17,10 +17,16 @@ import (
 	"github.com/mdhender/assemblage/internal/store"
 )
 
-// PLAN.md M13 acceptance 3, the three tests it asks for: a cross-origin POST
-// to a cookie-authenticated route is rejected, the same request with the
-// correct Origin succeeds, and a bearer-token request with no Origin at all
-// succeeds.
+// The three cases DESIGN.md 11 asks for: a cross-origin write on a
+// cookie-authenticated route is rejected, the same request with the correct
+// Origin succeeds, and a bearer-token request with no Origin at all succeeds.
+//
+// The cookie outlived the HTML UI it was built for (issue #3). internal/api
+// still accepts it, and the development log-me-in route still issues one so a
+// browser-driving agent can reach the preview mount without a bearer token --
+// so there is still an ambient credential here, and it still has to be
+// guarded. These tests drive the cookie against the API's own sign-out, which
+// is what a browser holding one would call.
 //
 // The protection is net/http.CrossOriginProtection, wrapped around the whole
 // mux in withCSRF and exempting a request that carries a bearer token
@@ -126,11 +132,12 @@ func (h *csrfHarness) post(t *testing.T, path string, decorate func(*http.Reques
 	return rec
 }
 
-// TestCrossOriginCookiePostIsRejected is acceptance 3's first test.
+// TestCrossOriginCookiePostIsRejected is the first of the three.
 func TestCrossOriginCookiePostIsRejected(t *testing.T) {
 	h := newCSRFHarness(t)
 
-	rec := h.post(t, "/logout", func(r *http.Request) {
+	rec := h.post(t, "/api/v1/sessions/current", func(r *http.Request) {
+		r.Method = http.MethodDelete
 		r.AddCookie(h.cookie)
 		r.Header.Set("Origin", "https://evil.example.com")
 		// Sec-Fetch-Site is what a browser sends and what the protection
@@ -138,7 +145,7 @@ func TestCrossOriginCookiePostIsRejected(t *testing.T) {
 		r.Header.Set("Sec-Fetch-Site", "cross-site")
 	})
 	if rec.Code != http.StatusForbidden {
-		t.Fatalf("a cross-origin cookie POST = %d, want 403", rec.Code)
+		t.Fatalf("a cross-origin cookie request = %d, want 403", rec.Code)
 	}
 
 	// And the session survives, which is the thing the refusal protects: a
@@ -148,25 +155,26 @@ func TestCrossOriginCookiePostIsRejected(t *testing.T) {
 	}
 }
 
-// TestSameOriginCookiePostSucceeds is acceptance 3's second test: the same
-// request with the correct Origin.
+// TestSameOriginCookiePostSucceeds is the second: the same request with the
+// correct Origin.
 func TestSameOriginCookiePostSucceeds(t *testing.T) {
 	h := newCSRFHarness(t)
 
-	rec := h.post(t, "/logout", func(r *http.Request) {
+	rec := h.post(t, "/api/v1/sessions/current", func(r *http.Request) {
+		r.Method = http.MethodDelete
 		r.AddCookie(h.cookie)
 		r.Header.Set("Origin", h.origin)
 		r.Header.Set("Sec-Fetch-Site", "same-origin")
 	})
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("a same-origin cookie POST = %d, want 303: %s", rec.Code, rec.Body)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("a same-origin cookie request = %d, want 204: %s", rec.Code, rec.Body)
 	}
 	if _, err := h.svc.Authenticate(t.Context(), h.token); err == nil {
-		t.Error("the session survived a sign-out that answered 303")
+		t.Error("the session survived a sign-out that answered 204")
 	}
 }
 
-// TestBearerPostWithNoOriginSucceeds is acceptance 3's third test.
+// TestBearerPostWithNoOriginSucceeds is the third.
 //
 // A request with no Origin at all is what a command-line client sends, and
 // earl is one. It is exempt because it carries a bearer token: a browser does

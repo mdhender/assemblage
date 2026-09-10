@@ -16,8 +16,13 @@ inference from the code.
 - Each package's `doc.go` states its purpose *and its permitted imports*. Read
   the `doc.go` before adding an import to a package.
 
+- `docs/adrs/` — design notes that outlived the code that held them. Read one
+  before rebuilding the thing it describes.
+
 Code comments cite "invariant N" (1–23). There is no master list in the repo;
-`grep -rn "invariant 8"` finds the places that state and enforce it.
+`grep -rn "invariant 8"` finds the places that state and enforce it. Invariant 23
+(autofill) no longer has code: it was the HTML UI's, and is now
+`docs/adrs/0001-autofill-policy-for-form-clients.md`.
 
 **Names.** The commands are `asmd` (server), `asmdb` (database lifecycle), and
 `earl` (API client); the database file is always `assemblage.db`; the
@@ -60,6 +65,11 @@ Caddy is a machine-wide Homebrew service that already terminates TLS for
 `https://htmx-app.localhost:8443` → `127.0.0.1:18443`. **Never run `caddy`
 yourself**; `deploy/Caddyfile.dev` is an example only. If it is not started, ask.
 
+That host name is **not** this application's and must not be renamed: it is the
+shared vhost for every Go + HTMX application on this laptop, and it kept the name
+after issue #3 removed the HTML UI. Renaming it means editing a Caddyfile several
+unrelated projects depend on.
+
 ```sh
 mkdir -p var                                   # no command creates a directory
 go run ./cmd/asmdb init --db ./var             # creates ./var/assemblage.db
@@ -77,8 +87,11 @@ locally; `--env` governs the running server but not which files were read.
 Always pass `--timeout` in development so an abandoned server does not sit on the
 SQLite lock. With `--env development` two agent affordances exist:
 `GET /__development/log-me-in/{email}?returnTo=` and
-`GET|POST /__development/shut-it-down`. They are gated on the resolved
-environment and nothing else — there is no build tag hiding them.
+`GET|POST /__development/shut-it-down` (`internal/devroutes`). They are gated on
+the resolved environment and nothing else — there is no build tag hiding them.
+With no `returnTo` the login route answers the session token as text or JSON;
+`returnTo` sets the cookie and redirects, which is how a browser-driving agent
+reaches `/preview/{name}`.
 
 `earl` talks to the public origin, not the Go listener:
 
@@ -95,9 +108,9 @@ assertion that `ASSEMBLAGE_ENV=production` is exported.
 Four layers, dependencies point **downward only**:
 
 ```
-transport   internal/api (JSON)      internal/web (HTML/HTMX)
-                   \                       /
-service             internal/service  ────┘
+transport           internal/api (JSON)
+                            |
+service             internal/service
                             |
 domain              internal/domain   (types, invariants, pure functions)
                             |
@@ -108,9 +121,11 @@ storage             internal/store    (SQL, zombiezen)
   no `time.Now`. A test asserts it.
 - `store` holds **all** SQL and no business decisions.
 - `service` owns transactions, writes events, enqueues jobs. A use case lives here.
-- `api` and `web` parse a request, call one service method, render. They never
-  touch `store`. `web` is a *client* of the same service methods `api`
-  serialises, so it can perform nothing `earl` cannot — a test enforces that.
+- `api` parses a request, calls one service method, renders. It never touches
+  `store`. There was a second transport, `internal/web` (HTML/HTMX), removed in
+  issue #3; a transport is a *client* of the service, holding no state the API
+  lacks and permitting no operation it does not expose, and one added later
+  arrives with the test that says so.
 
 `workflow`, `authz`, `publish`, `jobs`, `events` sit beside `service`: logic too
 specific for `domain`, too reusable for one service method. `events` deliberately
@@ -155,9 +170,6 @@ pure function in `domain` that both callers use.
 - **`server.public_origin` is configuration**, never inferred from `Host`. It
   feeds absolute URLs, cookies, and the `net/http.CrossOriginProtection`
   trusted-origin list. `X-Forwarded-*` is honoured only from `trusted_proxies`.
-- **Every form control carries `{{noAutofill}}`** except the login and
-  invitation-redemption forms; a template walk test fails on a control that
-  declares neither.
 - Routing is `net/http.ServeMux` only — no third-party router. CSRF is
   `net/http.CrossOriginProtection` (the reason Go 1.25 is a hard floor).
 
@@ -167,7 +179,7 @@ pure function in `domain` that both callers use.
 - `store`: a real in-memory SQLite through the same create path, foreign keys on.
   Never a mock.
 - `service`: public methods, real store, fake clock; assert on emitted events.
-- `api`/`web`: `httptest`, asserting status, problem type, and body shape.
+- `api`: `httptest`, asserting status, problem type, and body shape.
 - End-to-end tests in `cmd/asmd` build the real binaries and drive `earl` against
   an `asmd` on a `t.TempDir()` database. **No test helper calls `os.MkdirAll`** —
   a helper that creates what the commands refuse to create is a hole in the rule.
@@ -190,7 +202,8 @@ From `AGENTS.md`:
 
 Other conventions: every Go file carries the `// Copyright (c) 2026 Michael D
 Henderson.` header (MIT); vendored third-party files keep their licence text
-beside them (see `internal/web/static/htmx-LICENSE.txt`).
+beside them. Nothing is vendored today — the last was HTMX, which went with the
+UI in issue #3.
 
 `.env` files load through `internal/dotenv` in precedence order
 `.env.{env}.local`, `.env.local`, `.env.{env}`, `.env`; the `.local` files are

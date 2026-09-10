@@ -1,7 +1,6 @@
 // Copyright (c) 2026 Michael D Henderson.
 
-// Command asmd serves the REST API, the HTMX UI, and the background job
-// workers. It speaks plain HTTP on loopback and never terminates TLS; a
+// Command asmd serves the REST API and the background job workers. It speaks plain HTTP on loopback and never terminates TLS; a
 // reverse proxy does that (DESIGN.md 11, invariant 15).
 //
 // It opens the database named by --db and verifies it, and it does nothing
@@ -134,7 +133,7 @@ type flags struct {
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           program,
-		Short:         "Serve the assemblage API, the HTMX UI, and the job workers",
+		Short:         "Serve the assemblage API and the job workers",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

@@ -14,5 +14,5 @@
 // dates are testable at an arbitrary instant (invariant 3).
 //
 // Permitted imports: internal/domain, internal/store, and the subsystem
-// packages beside it. Never internal/api or internal/web.
+// packages beside it. Never internal/api.
 package service

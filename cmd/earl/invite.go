@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path"
 	"text/tabwriter"
 	"time"
 
@@ -51,10 +50,9 @@ type invitationsResponse struct {
 	Invitations []invitationResponse `json:"invitations"`
 }
 
-// createdInvitationResponse carries the link, once.
+// createdInvitationResponse carries the token, once.
 type createdInvitationResponse struct {
 	Invitation invitationResponse `json:"invitation"`
-	Link       string             `json:"link"`
 	Token      string             `json:"token"`
 }
 
@@ -65,7 +63,7 @@ func newInviteCmd() *cobra.Command {
 		Short: "Invite people, and manage the invitations",
 		Long: "Invite people, and manage the invitations.\n\n" +
 			"Registration is invite-only: there is no sign-up route. An invitation is\n" +
-			"good for 48 hours and for one use, and the link is printed once, by\n" +
+			"good for 48 hours and for one use, and the token is printed once, by\n" +
 			"\"invite create\" -- what the server stores is a hash of it, so nothing can\n" +
 			"print it again.\n\n" +
 			"Inviting an address that already has a pending invitation replaces it:\n" +
@@ -109,9 +107,10 @@ func newInviteCreateCmd() *cobra.Command {
 			fmt.Fprintf(w, "invited %s\n", out.Invitation.Email)
 			fmt.Fprintf(w, "invitation: %s\n", out.Invitation.UID)
 			fmt.Fprintf(w, "expires:    %s\n", out.Invitation.ExpiresAt.Format(time.RFC3339))
-			fmt.Fprintf(w, "link:       %s\n", out.Link)
-			fmt.Fprintln(w, "\nSend that link to them. It is shown once, works once, and there is\n"+
-				"no e-mail transport yet, so sending it is yours to do.")
+			fmt.Fprintf(w, "token:      %s\n", out.Token)
+			fmt.Fprintln(w, "\nSend that token to them, to redeem with \"earl invite redeem\". It is\n"+
+				"shown once, works once, and there is no e-mail transport yet, so sending\n"+
+				"it is yours to do.")
 			return nil
 		},
 	}
@@ -295,7 +294,6 @@ func newInviteRedeemCmd() *cobra.Command {
 	var (
 		server        string
 		token         string
-		link          string
 		email         string
 		name          string
 		passwordStdin bool
@@ -310,20 +308,13 @@ func newInviteRedeemCmd() *cobra.Command {
 			"is created and you sign in with \"earl login\" afterwards, with the\n" +
 			"password you set here.\n\n" +
 			"The address is required, and it has to be the one that was invited: a\n" +
-			"forwarded link is not usable by whoever received it. Every refusal is\n" +
+			"forwarded token is not usable by whoever received it. Every refusal is\n" +
 			"the same refusal, because a server that said which of them it was would\n" +
 			"be a way to find out who has an account.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if token == "" && link == "" {
-				return fmt.Errorf("one of --token or --link is required")
-			}
-			if link != "" {
-				parsed, err := tokenFromLink(link)
-				if err != nil {
-					return err
-				}
-				token = parsed
+			if token == "" {
+				return fmt.Errorf("--token is required")
 			}
 			password, err := readPassword(cmd.InOrStdin(), email, passwordStdin)
 			if err != nil {
@@ -359,8 +350,7 @@ func newInviteRedeemCmd() *cobra.Command {
 	}
 	addServerFlag(cmd, &server)
 	addJSONFlag(cmd, &asJSON)
-	cmd.Flags().StringVar(&token, "token", "", "the token from the invitation link")
-	cmd.Flags().StringVar(&link, "link", "", "the whole invitation link, instead of --token")
+	cmd.Flags().StringVar(&token, "token", "", "the token that was sent to you")
 	cmd.Flags().StringVar(&email, "email", "", "the address that was invited")
 	cmd.Flags().StringVar(&name, "name", "", "your name, as it should appear")
 	cmd.Flags().BoolVar(&passwordStdin, "password-stdin", false,
@@ -368,20 +358,6 @@ func newInviteRedeemCmd() *cobra.Command {
 	_ = cmd.MarkFlagRequired("email")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
-}
-
-// tokenFromLink pulls the token out of an invitation link, so that somebody can
-// paste what they were sent rather than editing it first.
-func tokenFromLink(link string) (string, error) {
-	u, err := url.Parse(link)
-	if err != nil {
-		return "", fmt.Errorf("--link %q: %v", link, err)
-	}
-	token := path.Base(u.Path)
-	if token == "" || token == "." || token == "/" {
-		return "", fmt.Errorf("--link %q carries no token", link)
-	}
-	return token, nil
 }
 
 // userResponse is one account as the API speaks it.

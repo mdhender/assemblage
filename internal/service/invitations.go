@@ -62,19 +62,22 @@ type NewInvitation struct {
 	Email string
 }
 
-// CreatedInvitation is a new invitation and the link that redeems it.
+// CreatedInvitation is a new invitation and the token that redeems it.
 //
-// The link exists in this struct and nowhere else, ever again. What the database
-// holds is a SHA-256, so there is nothing to retrieve afterwards and no route
-// that could retrieve it -- which is why the transports show it once, the way
-// "asmdb bootstrap admin" shows a generated password once.
+// The token exists in this struct and nowhere else, ever again. What the
+// database holds is a SHA-256, so there is nothing to retrieve afterwards and
+// no route that could retrieve it -- which is why the transports show it once,
+// the way "asmdb bootstrap admin" shows a generated password once.
+//
+// It was a link until issue #3. The absolute URL was built for the redemption
+// page internal/web served, and with no page to land on a URL would be a
+// credential dressed up as somewhere to go. The administrator sends the token
+// and the recipient redeems it with earl.
 type CreatedInvitation struct {
 	Invitation domain.Invitation
 
-	// Token is the credential in the link; Link is the absolute URL to put in
-	// front of a person. Both are returned once.
+	// Token is the credential, returned once.
 	Token string
-	Link  string
 }
 
 // Invitations lists invitations, by default only the pending ones.
@@ -180,7 +183,6 @@ func (s *Service) CreateInvitation(ctx context.Context, actor domain.Identity, i
 	return CreatedInvitation{
 		Invitation: created,
 		Token:      token,
-		Link:       s.origin.InvitationLink(token),
 	}, nil
 }
 

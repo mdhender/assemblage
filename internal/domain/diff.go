@@ -10,8 +10,7 @@ import (
 // Word-level diff between two versions (PLAN.md M3).
 //
 // It is here, in domain, because it is a pure function over two values and
-// because the API, the CLI, and eventually the HTMX UI must all show the same
-// answer. The rendering is git's "--word-diff=plain" notation -- deletions in
+// because the API and the CLI must show the same answer. The rendering is git's "--word-diff=plain" notation -- deletions in
 // [-brackets-], insertions in {+braces+} -- because it is a format editors
 // already read and because it is stable enough to keep in a golden file
 // (acceptance 7).

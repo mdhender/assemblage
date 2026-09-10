@@ -88,19 +88,20 @@ func newInvitationResponse(inv domain.Invitation, now time.Time) invitationRespo
 }
 
 // createdInvitationResponse is POST /api/v1/invitations, and it is the only
-// place a link is ever rendered.
+// place the token is ever rendered.
 //
-// The link is shown once, the way "asmdb bootstrap admin" shows a generated
+// The token is shown once, the way "asmdb bootstrap admin" shows a generated
 // password once. There is no e-mail transport yet (#4), so the administrator
 // sends it by hand; when there is one, this response stops being the only way
 // it reaches anybody and still does no harm.
+//
+// It carried an absolute "link" alongside the token until issue #3, for the
+// redemption page internal/web served. With that page gone the URL would name
+// a route nothing answers, so the response is the credential and nothing else.
 type createdInvitationResponse struct {
 	Invitation invitationResponse `json:"invitation"`
 
-	// Link is the absolute URL to put in front of a person, and Token is the
-	// credential inside it, for a client that would rather build its own. Both
-	// appear here and never again.
-	Link  string `json:"link"`
+	// Token is the credential, and it appears here and never again.
 	Token string `json:"token"`
 }
 
@@ -204,7 +205,6 @@ func (h *Handler) createInvitation(w http.ResponseWriter, r *http.Request, ident
 	}
 	writeJSON(w, http.StatusCreated, createdInvitationResponse{
 		Invitation: newInvitationResponse(created.Invitation, h.svc.Now()),
-		Link:       created.Link,
 		Token:      created.Token,
 	})
 }

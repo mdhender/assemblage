@@ -44,15 +44,14 @@ never a table of our own | | Application ID | `0x41534D30` — ASCII `ASM0`,
 `1095978288` (§13.2) | | Database file | always `assemblage.db`, inside a
 directory `--db` names and nothing creates (§13.1) | | HTTP routing | standard
 library `net/http.ServeMux` only — **no third-party router** | | CSRF | standard
-library `net/http.CrossOriginProtection` (Go 1.25) | | Server-rendered UI |
-`html/template` + HTMX, as an API client (§3) | | Markdown, if needed |
+library `net/http.CrossOriginProtection` (Go 1.25) | | Markdown, if needed |
 `github.com/yuin/goldmark` | | CLI framework | `github.com/spf13/cobra` —
 retained, already a dependency | | TLS | terminated by a reverse proxy, never by
 `asmd` (§11) | | Licence | MIT; every Go file carries the existing header |
 
 Go 1.25 is the floor because `net/http.CrossOriginProtection` arrived in it.
-That is the CSRF defence for the HTMX UI and there is no reason to reimplement
-it. Do not lower the floor to accommodate an older toolchain.
+That is the CSRF defence for the session cookie (§11) and there is no reason to
+reimplement it. Do not lower the floor to accommodate an older toolchain.
 
 `net/http.ServeMux` has had method and wildcard patterns since
 Go 1.22, which is everything the route table in §12 needs.
@@ -79,9 +78,9 @@ checking that are easy to get wrong — see §11.
 Four layers with a strict, one-directional dependency rule:
 
 ```
-  transport   internal/api  (JSON)      internal/web  (HTML/HTMX)
-                     \                        /
-  service             internal/service  ────┘
+  transport             internal/api  (JSON)
+                              |
+  service             internal/service
                               |
   domain              internal/domain   (types, invariants, pure functions)
                               |
@@ -98,26 +97,32 @@ Four layers with a strict, one-directional dependency rule:
 - `service` imports `domain` and `store`. It owns transactions, orchestrates
   operations, writes events, and enqueues jobs. **This is where a "use case"
   lives.**
-- `api` and `web` import `service`. They parse requests, call one service
-  method, and render a response. They contain no business logic and never touch
-  `store` directly.
+- `api` imports `service`. It parses requests, calls one service method, and
+  renders a response. It contains no business logic and never touches `store`
+  directly. The same is required of any transport added beside it.
 
 If you find yourself wanting to break this rule, the answer is almost always
 that a decision belongs in `domain` as a pure function that both layers call.
 
 ### Why this shape
 
-Because `earl` and the HTMX UI must be able to do exactly the same things. If
-business logic lives in HTTP handlers, the CLI drifts from the UI and the two
-disagree about what is allowed. One service layer, two transports, and the CLI
-is a client of the same API the UI uses.
+Because every client must be able to do exactly the same things. If business
+logic lives in HTTP handlers, one client drifts from another and the two
+disagree about what is allowed. One service layer, one transport, and `earl` is
+a client of the API like anything else.
 
-**The HTMX UI is a client, not the application.** `internal/web` renders HTML
-fragments by calling the same service methods `internal/api` serialises to JSON.
-It holds no state the API does not have and permits no operation the API does
-not expose. The test for this is in `docs/PLAN.md` M13: the UI must perform no
-operation `earl` cannot also perform. Keeping that true is what stops a
-second, accidental application growing inside the templates.
+**A transport is a client, not the application.** This was written when there
+were two — `internal/web` rendered HTML by calling the same service methods
+`internal/api` serialises to JSON, and a test held it to performing no operation
+`earl` could not. That UI was removed in issue #3 and assemblage is a content
+management server with a JSON API and nothing else.
+
+The rule outlives it, because it is the rule that made the removal cheap: the UI
+came out in an afternoon precisely because nothing had accumulated behind it.
+**A second transport added later holds no state the API does not have and
+permits no operation the API does not expose**, and it arrives with the test
+that says so. What that rule prevents is a second, accidental application
+growing inside a set of templates.
 
 This is also the structural fix for the worst bug in the Perl original: its
 permission check for moving a document between desks lived only in the template
@@ -144,9 +149,8 @@ internal/
   events/           event recording, alert rule evaluation, notifications
   render/           template lookup + execution, and the preview scratch tree
   api/              JSON REST handlers, request/response types
-  web/              HTMX handlers, html/template files, and the UI's static assets
-  edge/             what both transports must agree on: the status mapping, the session cookie
-  web/devroutes/    the `/__development/*` handlers; registered only in development
+  edge/             what everything at the HTTP edge must agree on: the status mapping, the session cookie
+  devroutes/        the `/__development/*` handlers; registered only in development
   server/           the composition root: the route table, and the one shutdown path
   buildenv/         the build/environment interlock (§14); the only tagged files
   clock/            Clock interface and implementations
@@ -180,7 +184,7 @@ quietly reimplemented by a second caller.
 `reqctx` is a leaf holding the context keys and accessors for the values
 resolved once per request: the client address (§11, "Trust forwarded headers
 only from the proxy"), the request id, and the authenticated identity. It
-exists so that `api`, `web`, `web/devroutes` and `server` can agree on those
+exists so that `api`, `devroutes` and `server` can agree on those
 values without importing one another, and so that the client address is
 resolved in exactly one middleware — a second parse downstream is a second
 policy, and the two disagree in only one direction.
@@ -189,19 +193,22 @@ policy, and the two disagree in only one direction.
 this document are written as "one function": mapping a domain error to an HTTP
 status happens only at the transport edge, in one place (§14), and the session
 cookie is written by one path in the process, never two (§12, invariant 13).
-Until M13 there was one transport and both held by construction. With two, a
-copy of either in `internal/web` would be a second policy — two functions that
+A copy of either elsewhere would be a second policy — two functions that
 disagree about what "conflict" means, or a second cookie that is missing
-`Secure` — and the alternative, `web` importing `api`, is the sibling
-dependency `reqctx` exists to avoid. So both live in a leaf that imports the
-standard library, `domain`, and `config`, and holds nothing else. It renders
-nothing: the problem document is `api`'s, because RFC 9457 is the JSON API's
-contract, and the HTML error page is `web`'s. What is shared is the decision,
-not the presentation.
+`Secure` — and the alternative, a transport importing `api`, is the sibling
+dependency `reqctx` exists to avoid.
+
+It was extracted for the HTML UI removed in issue #3, and it stays because the
+second cookie writer does: `api` issues the session cookie at login and
+`devroutes` issues one at `log-me-in`, so "one cookie-writing path" is still a
+rule with two callers to hold. Both live in a leaf that imports the standard
+library, `domain`, and `config`, and holds nothing else. It renders nothing: the
+problem document is `api`'s, because RFC 9457 is the JSON API's contract. What
+is shared is the decision, not the presentation.
 
 `server` sits above the transports and holds no business logic. It exists
 because two things have nowhere else to live. The first is the route table:
-`api`, `web`, and `web/devroutes` each own their handlers, but something has to
+`api` and `devroutes` each own their handlers, but something has to
 decide which of them are mounted, and that decision *is* the gate on the
 development routes (§11). Building the table is a function rather than a side
 effect of serving, so `asmd routes` prints the table the running configuration
@@ -1638,12 +1645,15 @@ require `--env development` and nothing else; see "Development affordances"
 below. `asmd routes` prints the table the running configuration actually
 produces, so it is the way to ask whether they are registered.
 
-Serves four things from one process:
+Serves three things from one process:
 
 - `/api/v1/...` — the JSON REST API (§12)
 - `/preview/...` — rendered previews, authenticated and sandboxed (§8.4)
-- `/...` — the HTMX UI, `html/template` rendered
 - background job workers, unless `--workers 0`
+
+There is no fourth. An HTML UI was served at the root of the path space until
+issue #3; the root is now unrouted, and a browser pointed at it gets a 404 from
+the mux because nothing answers it.
 
 `--templates`, `--preview`, and `--output` name directories that must already
 exist, and none of the three roots is ever created (§8.3, §8.4, invariant 19).
@@ -1672,7 +1682,14 @@ model, not two.
 | Development | `https://htmx-app.localhost:8443/` | `127.0.0.1:18443` |
 | Production | the site's real origin | loopback, port from config |
 
-The development proxy is the machine-wide Homebrew Caddy service, which reads
+The development host name is not this application's. `htmx-app.localhost` is the
+shared vhost every Go + HTMX application on the development laptop is reached
+through — a machine-wide convenience that predates assemblage and has nothing to
+do with it, which is why it kept the name after the HTML UI was removed in issue
+#3. It is not a claim that this server serves HTMX, and renaming it would mean
+changing a Caddyfile several unrelated projects depend on.
+
+The development proxy is that machine-wide Homebrew Caddy service, which reads
 `/opt/homebrew/etc/Caddyfile`. It issues a local certificate for `*.localhost`
 from its own internal CA automatically, so there is nothing to install. Never
 run Caddy directly; `deploy/Caddyfile.dev` in this repository documents the
@@ -1989,8 +2006,8 @@ GET    /api/v1/users                            ?q= matches an address or a name
 GET    /api/v1/users/{uid}
 
 GET    /api/v1/invitations                      ?status=pending (default), all, or one of the four
-POST   /api/v1/invitations                      {"email":"..."} → 201 carrying the link, once
-GET    /api/v1/invitations/{uid}                never the link
+POST   /api/v1/invitations                      {"email":"..."} → 201 carrying the token, once
+GET    /api/v1/invitations/{uid}                never the token
 POST   /api/v1/invitations/{uid}/revoke         {"reason":"..."} optional
 POST   /api/v1/invitations/redemption           unauthenticated; creates the account, issues no session
 
@@ -2223,80 +2240,49 @@ same `refusals` list, so a client parses one shape whichever answer it gets.
 Requests carry `Idempotency-Key` on `POST`s that create jobs; store the key with
 the created resource and return the same result on replay.
 
-### The HTML UI
+### There is no HTML UI
 
-`internal/web` serves the same application at the root of the path space:
-`/` is the dashboard, `/documents/{uid}` is a page somebody can be sent a link
-to, and `/login` is the form. It is registered beside the API and under the
-same condition — a server with a database has both or neither — and it declares
-`GET /{$}` rather than `GET /`, so an unregistered path is still a `404` from
-the mux instead of a dashboard drawn for a typo.
+`internal/web` served the same application at the root of the path space — `/`
+the dashboard, `/documents/{uid}` a page somebody could be sent a link to,
+`/login` the form — with `html/template` and a vendored HTMX runtime. It was
+removed in issue #3. Assemblage is a content management server: the JSON API is
+the whole of the HTTP surface a person's client talks to, and `earl` is the
+client this repository ships.
 
-Four things about its shape are decisions rather than details.
+The root of the path space is now unrouted. Nothing is registered at `GET /{$}`,
+so a browser pointed at the origin gets a 404 from the mux rather than a page,
+and `/static/` is gone with the stylesheet and the runtime it served.
 
-**Autocomplete is denied by default and opted into twice** (invariant 23).
-Every form control carries `{{noAutofill}}` — `autocomplete="off"` plus
-1Password's, LastPass's and Dashlane's documented opt-outs — unless it is one of
-the two forms holding the viewer's own credentials, the login form and the
-invitation redemption form, which declare real tokens and say in the template
-why.
+**What the removal cost, and what it did not.** It cost the one browser-reachable
+flow that genuinely had no other client: invitation redemption, where the person
+redeeming has no account and therefore no `earl` credentials. `POST
+/api/v1/invitations` now returns the token rather than an absolute link, and the
+administrator sends the token for the recipient to redeem with `earl invite
+redeem --token`. A link naming a route nothing answers would be a credential
+dressed up as somewhere to go.
 
-This is deliberately more aggressive than the platform intends. `autocomplete`
-is advisory: password managers ignore it by policy, because sites spent years
-using it to break them on purpose, and Chrome overrides it wherever its
-heuristics feel confident. The heuristic keys on `type="email"` with
-`name="email"` — the exact shape of the box that invites somebody, whose one
-impossible value is the address of the person typing, and which 1Password
-covers with a banner that has to be dismissed before anything can be typed at
-all. So the address inputs that are not credentials are `type="text"` with
-`inputmode="email"`: the phone keyboard keeps its `@` and the heuristic loses
-its cue. Nothing is lost by it, because **validation was never the browser's
-job** — `domain.ValidateEmail` is the check and always was, deliberately weak,
-because the strong check is delivery.
+It cost nothing else, and that is the fact worth keeping. The UI was a client:
+it held no state the API lacked and performed no operation `earl` could not, and
+a test in `internal/server` held it to a table naming the API route behind every
+form it posted. Nothing had accumulated behind the templates, so removing them
+removed screens and not capability — no service method lost its only caller, no
+lower layer changed, and the API answers exactly what it answered before.
 
-A test walks the embedded templates and fails on a control that declares
-neither, which is the half that matters: the policy is not "we fixed the invite
-box", it is "a field added next year cannot quietly arrive undeclared".
+**If a client is built again**, it is a client. It calls the service methods the
+JSON routes serialise, holds no state the API does not have, permits no
+operation the API does not expose, and arrives with the test that says so (§3).
+Two things it should read first:
 
-**A form may only `GET` or `POST`, so the UI spells with a path what the API
-spells with a method.** `POST .../checkout/cancel` is the API's
-`DELETE .../checkout`, `POST .../approvals/withdraw` is
-`DELETE .../approvals/current`, and `POST .../due` is `PUT .../due`. The
-alternative is a hidden `_method` field, which is a second way of saying what
-the method already says and a second thing to get wrong. What has to match is
-the operation, and `docs/PLAN.md` M13 acceptance 5 is asserted as exactly that:
-every write the UI offers names the API route that performs the same thing, and
-a screen with no counterpart fails the build.
-
-**Every screen works with JavaScript turned off, and HTMX enhances it.** A form
-posts, the server answers `303`, and the browser follows it; the same handler,
-asked by HTMX, returns the fragment instead — the action bar, the discussion,
-the approvals panel, one notification row. One handler and two renderings of
-one answer. A UI that only worked the other way would be a UI that could not be
-tested without a browser, and the tests that matter here are the ones that
-forge a `POST` nobody's browser would send.
-
-**The UI's own templates are embedded and parsed once.** §14's "re-read from
-disk per request in development" is about the content template tree, which
-editors change while the system runs and `internal/render` reloads. These are
-the program's own screens; a UI that could be changed by editing a file beside
-the binary is a UI whose behaviour depends on what is in a directory nobody
-deployed. The stylesheet and the HTMX runtime are embedded beside them and
-served from `/static/`, so the UI needs no CDN and works on a machine with no
-route to the internet. HTMX is vendored rather than fetched: it is one
-minified file under a Zero-Clause BSD licence, kept beside its licence text
-(AGENTS.md, "Code conventions"), and a UI whose interactivity depends on a
-third party being reachable is a UI that stops working on the day they are
-not.
-
-The action bar is the milestone's whole point and is described where the rule
-lives: `Available` and `Do` share one check (§6.2), the bar is `Available`
-rendered, and a refused move is drawn disabled with its reason and the name of
-the guard that refused rather than left out. A forged `POST` for one is refused
-inside the transaction — a `409` when a guard or the state machine refused,
-a `403` when the caller simply may not — which is the same answer the JSON
-route gives, because both ask the same service method and map the result
-through the same function.
+- `docs/adrs/0001-autofill-policy-for-form-clients.md` — the autofill policy
+  that was invariant 23, deny-by-default on every form control, kept because it
+  was learned from a real defect rather than derived from a principle.
+- §6.2, the action bar. `Available` and `Do` share one check, the bar is
+  `Available` rendered, and a refused move is drawn disabled with its reason and
+  the name of the guard that refused, never left out. A forged `POST` for one is
+  refused inside the transaction — a `409` when a guard or the state machine
+  refused, a `403` when the caller simply may not. That is the structural fix
+  for the worst bug in the Perl original (§3) and it is a property of the
+  engine, not of the UI that was removed: it holds for the JSON route today.
 
 ## 13. Persistence rules
 
@@ -2510,8 +2496,9 @@ It governs:
 | Startup banner | prints the loud warning | prints `environment=production` |
 
 The template row is the content tree under `--templates`, which is edited by
-the people using the system. The UI's own screens are embedded in the binary
-and parsed once in both environments (§12, "The HTML UI").
+the people using the system. It is the only template tree the server has: the
+program's own screens were embedded in the binary and parsed once in both
+environments, and went with the UI in issue #3 (§12).
 
 `production` is also the right value for staging and for CI. A third value was
 considered and rejected: more states mean more combinations nobody tests, and
