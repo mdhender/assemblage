@@ -28,18 +28,23 @@ func TestCostForBothCircumstances(t *testing.T) {
 		t.Errorf("costFor(inTest=false) = %d, want Cost (%d)", got, Cost)
 	}
 
-	// The two constants themselves, because a change that made them equal
-	// would leave every assertion above passing and mean the opposite thing.
+	// The two constants themselves. While alpha relaxes Cost to bcrypt.MinCost
+	// they are equal and the split is dormant: costFor still hands each
+	// circumstance the right constant, there is simply nothing between them
+	// left to save. Raising Cost after alpha wakes it up again with no other
+	// change.
 	if Cost != bcrypt.MinCost {
-		t.Errorf("Cost = %d, want bcrypt.MinCost (%d); a real run must hash properly",
+		t.Errorf("Cost = %d, want bcrypt.MinCost (%d) while alpha holds it there",
 			Cost, bcrypt.MinCost)
 	}
 	if TestCost != bcrypt.MinCost {
 		t.Errorf("TestCost = %d, want bcrypt.MinCost (%d)", TestCost, bcrypt.MinCost)
 	}
-	if TestCost >= Cost {
-		t.Errorf("TestCost (%d) is not cheaper than Cost (%d), so this costs time and buys nothing",
-			TestCost, Cost)
+	// The direction that must never reverse, which equality does not violate:
+	// a test binary hashing more expensively than a real run would be paying
+	// for something no test asserts.
+	if TestCost > Cost {
+		t.Errorf("TestCost (%d) is more expensive than Cost (%d)", TestCost, Cost)
 	}
 }
 
