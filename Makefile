@@ -16,7 +16,16 @@ DEV_DB  ?= ./var
 .PHONY: check build test race vet fmt lint no-mkdir no-dev-routes one-state-writer no-version-writes one-clock tagged dev init seed bootstrap status release clean help
 
 ## check: the full gate. Run this before opening a PR.
-check: fmt vet lint build test race tagged
+##
+## race rather than test, because the race detector runs the same tests and
+## PLAN.md's definition of done asks for "go test ./... passes, including the
+## race detector" -- one instrumented run, not two of them. Running both meant
+## cmd/asmd compiled the three commands twice for the same answer.
+##
+## The plain test target stays, for the inner loop and for the case this one
+## cannot serve: -race needs cgo, so a CGO_ENABLED=0 environment can run test
+## and cannot run race.
+check: fmt vet lint build race tagged
 	@echo "check: ok"
 
 ## build: compile everything, including the three commands.
@@ -43,8 +52,9 @@ tagged:
 vet:
 	$(GO) vet ./...
 
-## fmt: fail if anything is unformatted. It does not rewrite; the diff is
-## yours to make.
+## fmt: fail if anything is unformatted.
+##
+## It does not rewrite; the diff is yours to make.
 fmt:
 	@unformatted=$$(gofmt -l .); \
 	if [ -n "$$unformatted" ]; then \
@@ -73,7 +83,7 @@ no-mkdir:
 		| grep -v '^\./internal/publish/tree\.go:'; then \
 		echo "lint: nothing may create a directory (invariant 19, DESIGN.md 13.1)"; exit 1; \
 	fi
-	@callers=$$(grep -rl 'MkdirAll\|Mkdir(' ./cmd ./internal --include='*.go' | grep -v '_test\.go$$'); \
+	@callers=$$(grep -rl 'MkdirAll\|Mkdir(' ./cmd ./internal --include='*.go' | grep -v '_test\.go$$' | sort); \
 	if [ "$$callers" != "./internal/publish/tree.go" ]; then \
 		echo "lint: the output tree is the one directory this system creates (invariant 19); found:"; \
 		echo "$$callers"; exit 1; \
@@ -129,8 +139,10 @@ no-version-writes:
 		echo "$$writers"; exit 1; \
 	fi
 
-## no-dev-routes: the /__development/* routes are registered only when the
-## resolved environment is exactly "development" (invariant 16).
+## no-dev-routes: only devroutes may register a /__development/ pattern (invariant 16).
+##
+## The routes are registered only when the resolved environment is exactly
+## "development".
 ##
 ## The grep catches a second switch being introduced; the test catches the gate
 ## being wrong. Both are cheap and neither replaces the other.
@@ -139,7 +151,7 @@ no-dev-routes:
 		| grep -v '^\./internal/web/devroutes/'; then \
 		echo "lint: only internal/web/devroutes may register a /__development/ pattern (invariant 16)"; exit 1; \
 	fi
-	@callers=$$(grep -rl 'devroutes\.Register' ./cmd ./internal --include='*.go' | grep -v '_test\.go$$'); \
+	@callers=$$(grep -rl 'devroutes\.Register' ./cmd ./internal --include='*.go' | grep -v '_test\.go$$' | sort); \
 	if [ "$$callers" != "./internal/server/routes.go" ]; then \
 		echo "lint: devroutes.Register has one call site, gated on the resolved environment; found:"; \
 		echo "$$callers"; exit 1; \
@@ -150,8 +162,10 @@ no-dev-routes:
 	@# passes. A check that cannot fail is worse than no check.
 	$(GO) test ./internal/web/devroutes/
 
-## one-state-writer: internal/workflow is the only writer of documents.state
-## (invariant 4), and all SQL lives in internal/store (invariant 2).
+## one-state-writer: one statement writes documents.state (invariants 2 and 4).
+##
+## internal/workflow is the only writer of the column, and all SQL lives in
+## internal/store.
 ##
 ## Both hold at once because the one statement that writes the column is inside
 ## store.ApplyTransition, which cannot run without the decision function the
@@ -164,7 +178,7 @@ one-state-writer:
 		echo "lint: documents.state is written by one statement, in internal/store/workflow.go (invariants 2 and 4)"; exit 1; \
 	fi
 	@callers=$$(grep -rl 'ApplyTransition' ./cmd ./internal --include='*.go' \
-		| grep -v '_test\.go$$' | grep -v '^\./internal/store/'); \
+		| grep -v '_test\.go$$' | grep -v '^\./internal/store/' | sort); \
 	if [ "$$callers" != "./internal/workflow/engine.go" ]; then \
 		echo "lint: ApplyTransition has one caller, in internal/workflow (invariant 4, DESIGN.md 6.3); found:"; \
 		echo "$$callers"; exit 1; \
@@ -189,7 +203,7 @@ dev:
 		echo "    mkdir $(DEV_DB) && make init"; exit 1; }
 	$(GO) run ./cmd/asmd serve --db $(DEV_DB) --env development --timeout 60m
 
-## init: create $(DEV_DB)/assemblage.db and apply every migration.
+## init: create the development database and apply every migration.
 ##
 ## The directory is yours to create; this only fills it. The first-run recipe
 ## is "mkdir var && make init seed bootstrap".
@@ -239,5 +253,10 @@ clean:
 	rm -rf $(RELEASE_DIR)
 
 ## help: list the targets.
+##
+## Only the "## name:" line is printed, so each one has to be a whole sentence
+## on its own. The commentary below it is for whoever opens this file.
 help:
-	@grep -E '^## [a-z-]+:' $(MAKEFILE_LIST) | sed 's/^## /  /'
+	@grep -E '^## [a-z-]+:' $(MAKEFILE_LIST) \
+		| sed 's/^## //' \
+		| awk -F': ' '{printf "  %-17s %s\n", $$1, substr($$0, index($$0, ": ") + 2)}'
