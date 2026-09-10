@@ -40,7 +40,7 @@ const DefaultLockLease = 2 * time.Hour
 // the prefix is only accepted on a cookie that is Secure, has no Domain, and
 // has Path=/, which makes a cookie without Secure not merely wrong but
 // rejected.
-const SessionCookieName = "__Host-cms_session"
+const SessionCookieName = "__Host-assemblage_session"
 
 // DefaultTrustedProxies is the CIDR list X-Forwarded-* headers are honoured
 // from: loopback, which is where the reverse proxy is (DESIGN.md 11).

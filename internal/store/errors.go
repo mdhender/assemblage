@@ -33,7 +33,7 @@ func (e *DirError) Error() string {
 
 func (e *DirError) Unwrap() error { return e.Err }
 
-// NotFoundError reports that the directory exists but holds no cms.db.
+// NotFoundError reports that the directory exists but holds no assemblage.db.
 //
 // It is detected by SQLite's result code rather than by matching the message
 // (invariant 11): the open is made without OpenCreate, so a missing file is
@@ -65,7 +65,7 @@ func (e *ExistsError) Error() string {
 //
 // It catches three real cases with one check: an empty file, which reads as 0
 // and which sqlitemigration would have adopted; a database belonging to
-// another program; and a database belonging to a different CMS
+// another program; and a database belonging to a different application
 // (DESIGN.md 13.2, invariant 21).
 type AppIDError struct {
 	Path string

@@ -15,10 +15,10 @@ import (
 // newBackupCmd takes a consistent snapshot of a live database (#10).
 //
 // It exists rather than a documented "sqlite3 .backup" line because asmdb is
-// already on the server, already knows a database is DIR/cms.db, and already
-// refuses to open one whose application_id is not ASM0. sqlite3 inherits none
-// of that: pointed at the wrong directory it writes a zero-byte file and exits
-// 0, and it is not installed on the host anyway.
+// already on the server, already knows a database is DIR/assemblage.db, and
+// already refuses to open one whose application_id is not ASM0. sqlite3
+// inherits none of that: pointed at the wrong directory it writes a zero-byte
+// file and exits 0, and it is not installed on the host anyway.
 //
 // There is no restore command, on purpose. Restoring is a cp with the service
 // stopped, written out by a person who has stopped to think; the safe

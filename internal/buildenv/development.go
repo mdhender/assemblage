@@ -6,7 +6,7 @@ package buildenv
 
 import "os"
 
-// Verify panics if CMS_ENV is exported as "production". Any other value,
+// Verify panics if ASSEMBLAGE_ENV is exported as "production". Any other value,
 // including unset, is fine.
 //
 // The asymmetry with the tagged build is intentional. The ordinary binary
@@ -14,7 +14,7 @@ import "os"
 // export anything in order to run "go run ./cmd/asmd" is how you end up with a
 // shell profile that exports it everywhere.
 func Verify() {
-	if v := os.Getenv("CMS_ENV"); v == "production" {
-		panic("buildenv: built without -tags production and must not run with CMS_ENV=production")
+	if v := os.Getenv("ASSEMBLAGE_ENV"); v == "production" {
+		panic("buildenv: built without -tags production and must not run with ASSEMBLAGE_ENV=production")
 	}
 }

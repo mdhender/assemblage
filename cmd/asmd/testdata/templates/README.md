@@ -1,6 +1,6 @@
 # The end-to-end template tree
 
-This is the template tree `cmd/cmsd`'s M8 test points `cmsd --templates` at.
+This is the template tree `cmd/asmd`'s M8 test points `asmd --templates` at.
 
 It mirrors the shape `internal/render` searches
 (`DESIGN.md` §8.4): a site directory named by the site's domain, the category

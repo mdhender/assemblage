@@ -113,9 +113,9 @@ type Deliverer interface {
 
 // LogDeliverer is the default e-mail channel: it writes a line and returns.
 //
-// A CMS that sent mail from the box it was installed on would need a relay, a
-// bounce policy, and a queue of its own, and none of that is what M12 is
-// about. What the milestone needs is that the channel is behind an interface
+// An assemblage that sent mail from the box it was installed on would need a
+// relay, a bounce policy, and a queue of its own, and none of that is what M12
+// is about. What the milestone needs is that the channel is behind an interface
 // so an installation can supply the real one, and that the default says out
 // loud what it would have sent (PLAN.md M12).
 type LogDeliverer struct {

@@ -21,8 +21,8 @@ import (
 // part that matters most is that fillWAL is never checkpointed first.
 //
 // Commits live in the write-ahead log until something moves them, so a backup
-// that read only cms.db would come back missing every row written here. That
-// is the failure #11 turned out to be, arriving from the other direction.
+// that read only assemblage.db would come back missing every row written here.
+// That is the failure #11 turned out to be, arriving from the other direction.
 func TestBackupWritesAVerifiedSnapshot(t *testing.T) {
 	dir := t.TempDir()
 	db, err := Create(t.Context(), dir)
@@ -35,10 +35,10 @@ func TestBackupWritesAVerifiedSnapshot(t *testing.T) {
 	fillWAL(t, db, rows)
 	readOnce(t, db)
 	if n := sizeOf(t, filepath.Join(dir, dbFileName+"-wal")); n <= 0 {
-		t.Fatalf("cms.db-wal is %d bytes; the snapshot would not be proving anything", n)
+		t.Fatalf("assemblage.db-wal is %d bytes; the snapshot would not be proving anything", n)
 	}
 
-	to := filepath.Join(t.TempDir(), "cms-2026-09-09.db")
+	to := filepath.Join(t.TempDir(), "assemblage-2026-09-09.db")
 	report, err := db.Backup(t.Context(), to, BackupOptions{Now: time.Now().UTC()})
 	if err != nil {
 		t.Fatalf("Backup: %v", err)
@@ -123,7 +123,7 @@ func TestBackupRefusesAnExistingFile(t *testing.T) {
 	db, dir := fileStore(t)
 	fillWAL(t, db, 20)
 
-	to := filepath.Join(dir, "cms-2026-09-09.db")
+	to := filepath.Join(dir, "assemblage-2026-09-09.db")
 	if _, err := db.Backup(t.Context(), to, BackupOptions{Now: time.Now().UTC()}); err != nil {
 		t.Fatalf("first Backup: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestBackupCreatesNoDirectory(t *testing.T) {
 	db, dir := fileStore(t)
 	missing := filepath.Join(dir, "backups")
 
-	_, err := db.Backup(t.Context(), filepath.Join(missing, "cms.db"), BackupOptions{Now: time.Now().UTC()})
+	_, err := db.Backup(t.Context(), filepath.Join(missing, "assemblage.db"), BackupOptions{Now: time.Now().UTC()})
 	var dirErr *DirError
 	if !errors.As(err, &dirErr) {
 		t.Fatalf("Backup into a missing directory = %v, want a *DirError", err)
@@ -189,7 +189,7 @@ func TestBackupClearsAStalePartial(t *testing.T) {
 	db, dir := fileStore(t)
 	fillWAL(t, db, 20)
 
-	to := filepath.Join(dir, "cms.backup.db")
+	to := filepath.Join(dir, "assemblage.backup.db")
 	if err := os.WriteFile(to+partialSuffix, []byte("half a backup"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestARestoredBackupOpens(t *testing.T) {
 	const rows = 40
 	fillWAL(t, db, rows)
 
-	to := filepath.Join(t.TempDir(), "cms-2026-09-09.db")
+	to := filepath.Join(t.TempDir(), "assemblage-2026-09-09.db")
 	if _, err := db.Backup(t.Context(), to, BackupOptions{Now: time.Now().UTC()}); err != nil {
 		t.Fatalf("Backup: %v", err)
 	}

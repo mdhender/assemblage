@@ -268,7 +268,7 @@ func OpenMemory(ctx context.Context) (*DB, error) {
 	// Shared cache is what lets several connections see one in-memory
 	// database. It is not recommended for files and is the documented way to
 	// do this for memory.
-	uri := fmt.Sprintf("file:cms-memory-%d?mode=memory&cache=shared", memoryCounter.Add(1))
+	uri := fmt.Sprintf("file:assemblage-memory-%d?mode=memory&cache=shared", memoryCounter.Add(1))
 
 	conn, err := sqlite.OpenConn(uri, memoryWriteFlags)
 	if err != nil {

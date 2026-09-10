@@ -19,7 +19,7 @@ import (
 	"zombiezen.com/go/sqlite/sqlitex"
 )
 
-// TestCreate is PLAN.md M1 acceptance 1 and 4: init creates DIR/cms.db,
+// TestCreate is PLAN.md M1 acceptance 1 and 4: init creates DIR/assemblage.db,
 // running it twice is safe, and the result carries both markers.
 func TestCreate(t *testing.T) {
 	dir := t.TempDir()
@@ -30,7 +30,7 @@ func TestCreate(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	if want := filepath.Join(dir, "cms.db"); db.Path() != want {
+	if want := filepath.Join(dir, "assemblage.db"); db.Path() != want {
 		t.Errorf("Path() = %q, want %q; the file name is a constant", db.Path(), want)
 	}
 	if _, err := os.Stat(db.Path()); err != nil {
@@ -116,7 +116,8 @@ func TestOpenRefusesAFile(t *testing.T) {
 }
 
 // TestOpenMissingDatabase is PLAN.md M1 acceptance 10 at the store level: a
-// directory with no cms.db is a failure, and the failure creates nothing.
+// directory with no assemblage.db is a failure, and the failure creates
+// nothing.
 //
 // The detection is by result code — the open names no OpenCreate, so SQLite
 // answers SQLITE_CANTOPEN — never by matching the message (invariant 11).

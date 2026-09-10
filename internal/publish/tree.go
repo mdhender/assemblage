@@ -22,11 +22,11 @@ import (
 // This is the one place in the system that creates a directory, and it is
 // worth saying exactly why the rule bends here and nowhere else.
 //
-// Invariant 19 exists so that no tool creates the directory it was told to
-// use. "--db /var/lib/cms" that does not exist is a typo, and a tool that
-// makes it turns the typo into a plausible-looking, empty CMS somebody finds
-// out about hours later. That property is kept here in full: the output root
-// must already exist, NewTree refuses one that does not, and asmd opens it
+// Invariant 19 exists so that no tool creates the directory it was told to use.
+// "--db /var/lib/assemblage" that does not exist is a typo, and a tool that
+// makes it turns the typo into a plausible-looking, empty assemblage somebody
+// finds out about hours later. That property is kept here in full: the output
+// root must already exist, NewTree refuses one that does not, and asmd opens it
 // while starting so a mistyped --output is a refusal at startup rather than at
 // the first publish.
 //

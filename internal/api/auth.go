@@ -38,7 +38,7 @@ func (h *Handler) authenticated(next func(http.ResponseWriter, *http.Request, do
 // unauthenticated answers a 401 with the WWW-Authenticate header the status
 // code requires of us.
 func (h *Handler) unauthenticated(w http.ResponseWriter, r *http.Request, err error) {
-	w.Header().Set("WWW-Authenticate", `Bearer realm="cms"`)
+	w.Header().Set("WWW-Authenticate", `Bearer realm="assemblage"`)
 	h.writeError(w, r, err)
 }
 

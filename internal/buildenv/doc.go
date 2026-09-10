@@ -10,10 +10,10 @@
 // Three things about it are easy to get wrong, so they are stated here as
 // well as in the design:
 //
-//   - Verify reads the exported CMS_ENV only, never the resolved environment
-//     from the precedence chain in internal/config. It answers "is this binary
-//     on the machine it was built for", and it answers before flags, the config
-//     file, or defaults have been consulted.
+//   - Verify reads the exported ASSEMBLAGE_ENV only, never the resolved
+//     environment from the precedence chain in internal/config. It answers "is
+//     this binary on the machine it was built for", and it answers before
+//     flags, the config file, or defaults have been consulted.
 //   - Verify never gates a route or a feature. The /__development/* routes are
 //     gated on the resolved environment and nothing else (DESIGN.md 11). Do not
 //     reach for this tag to hide code.

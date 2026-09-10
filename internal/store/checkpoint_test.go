@@ -54,10 +54,10 @@ func TestCloseTruncatesTheWriteAheadLog(t *testing.T) {
 // TestTheDatabaseFileAloneIsCompleteAfterClose is why the symptom matters.
 //
 // deploy/README.md tells an operator to back up before migrating and the
-// natural thing to copy is cms.db, so cms.db on its own has to carry
-// everything that was committed. Copying only that file into a directory of
-// its own is exactly that backup, and the copy has to open and read back what
-// the original wrote.
+// natural thing to copy is assemblage.db, so assemblage.db on its own has to
+// carry everything that was committed. Copying only that file into a directory
+// of its own is exactly that backup, and the copy has to open and read back
+// what the original wrote.
 func TestTheDatabaseFileAloneIsCompleteAfterClose(t *testing.T) {
 	dir := t.TempDir()
 	db, err := Create(t.Context(), dir)

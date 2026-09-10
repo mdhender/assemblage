@@ -197,7 +197,7 @@ func devMux(seen *string) *http.ServeMux {
 		ValidateReturnTo: func(s string) (string, error) { return validReturnTo(s) },
 		SetSessionCookie: func(w http.ResponseWriter, token string, expires time.Time) {
 			http.SetCookie(w, &http.Cookie{
-				Name: "__Host-cms_session", Value: token, Path: "/",
+				Name: "__Host-assemblage_session", Value: token, Path: "/",
 				Expires: expires, Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
 			})
 		},

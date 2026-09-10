@@ -10,7 +10,7 @@ Read `docs/DESIGN.md` first. This document says *when*; that one says *what* and
 
 1. Re-read the milestone's section here and the sections of `DESIGN.md` it
    references. Do not start from memory of a previous session.
-2. Write the migration first, if the milestone has one. Run `cmsdb migrate up`
+2. Write the migration first, if the milestone has one. Run `asmdb migrate up`
    against a scratch database and inspect the result before writing Go.
 3. Write `domain` types and pure functions, with tests, before any I/O.
 4. Write `store` methods, with tests against a real in-memory database.
@@ -51,7 +51,7 @@ M11 (comments, approvals) and M12 (alerts) may proceed in parallel with the
 M7–M10 publishing chain once M4 lands. Everything else is a hard dependency.
 
 **M0–M6 is a working editorial system with no publishing.** M0–M9 is a working
-CMS. Ship at either boundary if you need to.
+content management system. Ship at either boundary if you need to.
 
 ---
 
@@ -63,18 +63,18 @@ present and doing nothing but printing their version.
 **Work.**
 - Set `go.mod` to **Go 1.25**. This is a hard floor:
   `net/http.CrossOriginProtection` arrived in 1.25 and is the CSRF defence.
-- Create `cmd/cmsdb`, `cmd/cmsd`, `cmd/earl`, each a cobra root with `version`.
+- Create `cmd/asmdb`, `cmd/asmd`, `cmd/earl`, each a cobra root with `version`.
   Cobra is retained.
 - Create the `internal/` tree from `DESIGN.md` §4 with a doc.go in each package
   stating its responsibility and its permitted imports.
 - **Delete `pkg/way`**, `cli/`, and the old single-binary command skeleton.
   Nothing replaces the router; the route table is `net/http.ServeMux` patterns.
   Preserve the MIT header convention in every new file.
-- `cmsd serve` binds `127.0.0.1:18443` by default and speaks plain HTTP. It
+- `asmd serve` binds `127.0.0.1:18443` by default and speaks plain HTTP. It
   never terminates TLS. See `DESIGN.md` §11, "Serving model".
 - Graceful shutdown as one code path, reached by `SIGTERM`, by `--timeout`
   expiry, and later by the dev shutdown route. Write it once.
-- `cmsd serve --timeout DURATION` — shut down gracefully after the duration,
+- `asmd serve --timeout DURATION` — shut down gracefully after the duration,
   exit 0, log one line naming the configured value. Default `0` = never.
   Ungated: this ships in production builds.
 - `internal/web/devroutes`, exposing a single `Register(mux, deps)` that the
@@ -82,8 +82,8 @@ present and doing nothing but printing their version.
   No build tag gates them — see `DESIGN.md` §11. In M0 it registers only
   `GET|POST /__development/shut-it-down`.
 - `internal/config`: the `environment` setting (`development` | `production`,
-  default **production**), resolved from `--env`, `$CMS_ENV`, file, default in
-  that order. See `DESIGN.md` §14.
+  default **production**), resolved from `--env`, `$ASSEMBLAGE_ENV`, file,
+  default in that order. See `DESIGN.md` §14.
 - The loopback-peer check; the startup banner printing the environment in both
   environments and the loud warning only in `development`; `WARN` logging on
   every `/__development/*` request.
@@ -91,60 +91,62 @@ present and doing nothing but printing their version.
   pair from `DESIGN.md` §14, exporting one `Verify()`. Each `main` calls it
   explicitly — **not** from `init()`, so `main` keeps control of when it runs.
 - Add a `Makefile` (or `Taskfile`) with `build`, `test`, `lint`, `check`, a
-  `dev` target that runs `go run ./cmd/cmsd serve --env development` (the `dev`
-  target must **not** start Caddy — that is a Homebrew service), and a
-  `release` target that cross-compiles all three commands with
-  `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags production -trimpath`
-  into `deploy/linux/amd64/`. Only `release` passes a tag; `go run ./cmd/...`
-  must work for every command without one.
+  `dev` target that runs `go run ./cmd/asmd serve --env development` (the `dev`
+  target must **not** start Caddy — that is a Homebrew service), and a `release`
+  target that cross-compiles all three commands with `GOOS=linux GOARCH=amd64
+  CGO_ENABLED=0 go build -tags production -trimpath` into `deploy/linux/amd64/`.
+  Only `release` passes a tag; `go run ./cmd/...` must work for every command
+  without one.
 - Add CI running the full gate on push, including the no-dev-routes assertion
-  and the no-directory-creation assertion
-  (`grep -rn 'os\.MkdirAll\|os\.Mkdir(' ./cmd ./internal` prints nothing).
-  Both are cheap greps that catch the two rules nobody notices breaking.
+  and the no-directory-creation assertion (`grep -rn 'os\.MkdirAll\|os\.Mkdir('
+  ./cmd ./internal` prints nothing). Both are cheap greps that catch the two
+  rules nobody notices breaking.
 
 **Acceptance.**
 1. `make check` passes from a clean clone on Go 1.25.
-2. `./cmsdb version`, `./cmsd version`, `./earl version` each print a version
+2. `./asmdb version`, `./asmd version`, `./earl version` each print a version
    and exit 0.
 3. `go list ./internal/domain` shows no repository-internal imports.
 4. `grep -r "pkg/way" .` returns nothing outside git history.
-5. With the Homebrew Caddy service running, `cmsd serve` yields a 200 from
-   `https://htmx-app.localhost:8443/healthz` with a valid certificate. Never
-   run Caddy directly, and never load `deploy/Caddyfile.dev` — it is an example
+5. With the Homebrew Caddy service running, `asmd serve` yields a 200 from
+   `https://htmx-app.localhost:8443/healthz` with a valid certificate. Never run
+   Caddy directly, and never load `deploy/Caddyfile.dev` — it is an example
    only. See `deploy/README.md`.
-6. `cmsd serve` with no `--addr` binds loopback. A test asserts the default is
+6. `asmd serve` with no `--addr` binds loopback. A test asserts the default is
    not `0.0.0.0` or a bare `:port`.
-7. `cmsd serve --timeout 2s` exits 0 within a small margin of two seconds,
+7. `asmd serve --timeout 2s` exits 0 within a small margin of two seconds,
    having drained in-flight requests. Test with a fake clock where possible and
    a real short duration in the end-to-end test.
-8. **With no `--env` and no `CMS_ENV`**, `/__development/shut-it-down` returns
-   404. This test gates release.
-9. `cmsd routes` with the default environment does not list any
+8. **With no `--env` and no `ASSEMBLAGE_ENV`**, `/__development/shut-it-down`
+   returns 404. This test gates release.
+9. `asmd routes` with the default environment does not list any
    `/__development/*` pattern, and lists them under `--env development`. The
    routes are absent from the mux, not registered and refused.
-10. With `--env development`,
-   `curl https://htmx-app.localhost:8443/__development/shut-it-down`
-   returns 200 **and the response is fully received** before the process exits;
-   the process then exits 0. Assert on the received body, not just the exit
-   code — this is the flush-before-shutdown requirement.
+10. With `--env development`, `curl
+   https://htmx-app.localhost:8443/__development/shut-it-down` returns 200 **and
+   the response is fully received** before the process exits; the process then
+   exits 0. Assert on the received body, not just the exit code — this is the
+   flush-before-shutdown requirement.
 11. Every command runs under `go run ./cmd/<name>` with no tag. A CI step runs
-   `go run ./cmd/cmsd version`, `./cmd/cmsdb version`, and
-   `./cmd/earl version` to keep it that way.
+   `go run ./cmd/asmd version`, `./cmd/asmdb version`, and `./cmd/earl version`
+   to keep it that way.
 12. An unset, empty, or misspelled environment resolves to `production`. A
    table-driven test covers `""`, `"Development"`, `"dev"`, `"prod"` — only the
    exact string `development` enables anything.
-13. `cmsd serve` logs its environment on startup in both environments.
-14. The interlock, four cases. Built without the tag: exits 0 with `CMS_ENV`
-   unset and with `CMS_ENV=development`, panics with `CMS_ENV=production`.
-   Built with `-tags production`: panics with `CMS_ENV` unset, exits 0 with
-   `CMS_ENV=production`. Run the tagged half in CI with `-tags production`.
+13. `asmd serve` logs its environment on startup in both environments.
+14. The interlock, four cases. Built without the tag: exits 0 with
+   `ASSEMBLAGE_ENV` unset and with `ASSEMBLAGE_ENV=development`, panics with
+   `ASSEMBLAGE_ENV=production`. Built with `-tags production`: panics with
+   `ASSEMBLAGE_ENV` unset, exits 0 with `ASSEMBLAGE_ENV=production`. Run the
+   tagged half in CI with `-tags production`.
 15. `grep -rn "func init" ./cmd ./internal/buildenv` shows no `init()` calling
    `Verify`. The call site is `main`, and a test asserts a `Verify` failure is
    reachable only after `main` has begun.
-16. `make release` produces `linux/amd64` binaries; `file deploy/linux/amd64/cmsd`
-   confirms the platform and `CGO_ENABLED=0` needed no toolchain.
+16. `make release` produces `linux/amd64` binaries; `file
+   deploy/linux/amd64/asmd` confirms the platform and `CGO_ENABLED=0` needed no
+   toolchain.
 
-**Out of scope.** Any behaviour beyond `/healthz` and shutdown. **`cmsd` opens
+**Out of scope.** Any behaviour beyond `/healthz` and shutdown. **`asmd` opens
 no database in M0 and has no `--db` flag yet** — it gains one in M1, under the
 rules in `DESIGN.md` §13.4. Do not add a database, a directory, or a file
 anywhere in this milestone; when the flag arrives it names an existing directory
@@ -152,10 +154,10 @@ and the server neither creates nor migrates what it finds there.
 
 ---
 
-## M1 — Storage and `cmsdb`
+## M1 — Storage and `asmdb`
 
 **Goal.** A database file can be created, migrated, and checked — and nothing
-except `cmsdb init` can bring one into existence.
+except `asmdb init` can bring one into existence.
 
 Read `DESIGN.md` §13 in full before writing a line of this milestone. Most of it
 is about what these commands must refuse to do.
@@ -165,55 +167,55 @@ is about what these commands must refuse to do.
   acceptance 6 and 7 mean anything: `0001_users.sql` and `0002_events.sql`.
   `users` carries only the identity columns M2 cannot change — the surrogate
   key, the `uid`, and the email and name `bootstrap admin` is given — and is
-  here because every foreign key in the schema eventually points at it.
-  `events` is `DESIGN.md` §10 unchanged, and is here because §10 says to wire
-  the audit spine from the first milestone that has a schema; its `actor_id`
-  foreign key is what acceptance 7's violating insert violates. Nothing writes
-  to either table in M1.
+  here because every foreign key in the schema eventually points at it. `events`
+  is `DESIGN.md` §10 unchanged, and is here because §10 says to wire the audit
+  spine from the first milestone that has a schema; its `actor_id` foreign key
+  is what acceptance 7's violating insert violates. Nothing writes to either
+  table in M1.
 - `internal/migrate`: `//go:embed schema/*.sql`, ordered, applied through
   `sqlitemigration`. The application ID is a constant here: `0x41534D30`, the
   ASCII bytes of `ASM0`, `1095978288` decimal, passed as
-  `sqlitemigration.Schema.AppID`. Schema version bookkeeping is
-  `PRAGMA user_version`, maintained by `sqlitemigration`. **No
-  `schema_migrations` table and no hand-rolled version tracking.**
-- `internal/store`: two entry points and one shared name.
-  - The database file name is the unexported constant `cms.db`. Both entry
-    points take a **directory** path and join it.
-  - `Create(dir)` — used only by `cmsdb init`. Fails if `dir` does not exist.
-    **Never creates a directory.** Opens with explicit flags including
-    `OpenCreate`, applies migrations, stamps the application ID.
-  - `Open(dir)` — used by every other `cmsdb` subcommand and by `cmsd`. Fails if
-    `dir` does not exist, fails if `cms.db` does not exist, and **never names
-    `OpenCreate`**. Verifies the application ID and the schema version; the
-    caller says whether a version behind the binary is an error (`cmsd`) or a
-    prompt to migrate (`cmsdb migrate up`).
-  - Pool construction per `DESIGN.md` §13.3 — WAL on persistent stores,
-    `foreign_keys=ON` on every connection of every store including in-memory,
-    `busy_timeout`, a read pool and one serialized writer. Explicit open flags
-    everywhere; the zero value creates.
+  `sqlitemigration.Schema.AppID`. Schema version bookkeeping is `PRAGMA
+  user_version`, maintained by `sqlitemigration`. **No `schema_migrations` table
+  and no hand-rolled version tracking.**
+- `internal/store`: two entry points and one shared name. - The database file
+  name is the unexported constant `assemblage.db`. Both entry points take a
+  **directory** path and join it. - `Create(dir)` — used only by `asmdb init`.
+  Fails if `dir` does not exist. **Never creates a directory.** Opens with
+  explicit flags including `OpenCreate`, applies migrations, stamps the
+  application ID. - `Open(dir)` — used by every other `asmdb` subcommand and by
+  `asmd`. Fails if `dir` does not exist, fails if `assemblage.db` does not
+  exist, and **never names `OpenCreate`**. Verifies the application ID and the
+  schema version; the caller says whether a version behind the binary is an
+  error (`asmd`) or a prompt to migrate (`asmdb migrate up`). - Pool
+  construction per `DESIGN.md` §13.3 — WAL on persistent stores,
+  `foreign_keys=ON` on every connection of every store including in-memory,
+  `busy_timeout`, a read pool and one serialized writer. Explicit open flags
+  everywhere; the zero value creates.
 - `internal/clock`: `Clock`, `Real`, `Fake`.
 - `internal/ids`: ULID generation.
-- `cmsdb init`, `cmsdb migrate status|up [--to N]`, `cmsdb check`, `cmsdb vacuum`.
-- `cmsdb check` runs `PRAGMA foreign_key_check`, `PRAGMA integrity_check`, and
+- `asmdb init`, `asmdb migrate status|up [--to N]`, `asmdb check`, `asmdb
+  vacuum`.
+- `asmdb check` runs `PRAGMA foreign_key_check`, `PRAGMA integrity_check`, and
   reports stuck job leases and orphaned resources (both empty for now). It also
   reports the application ID and schema version it found.
-- `cmsd serve` gains `--db DIR`. It calls `Open`, requires an exact schema
+- `asmd serve` gains `--db DIR`. It calls `Open`, requires an exact schema
   version match, and exits non-zero without a listener on any failure. It does
   not gain a `--migrate` flag, a `--create` flag, or any other way to say yes.
 
 **Acceptance.**
-1. `mkdir -p /tmp/x && cmsdb init --db /tmp/x` creates `/tmp/x/cms.db`; running
-   it twice is safe and reports "already initialised".
-2. **`cmsdb init --db /tmp/does-not-exist` exits non-zero, names the directory,
+1. `mkdir -p /tmp/x && asmdb init --db /tmp/x` creates `/tmp/x/assemblage.db`;
+   running it twice is safe and reports "already initialised".
+2. **`asmdb init --db /tmp/does-not-exist` exits non-zero, names the directory,
    and creates nothing.** A test asserts the directory still does not exist
-   afterwards. The same test exists for every other `cmsdb` subcommand and for
-   `cmsd serve`.
+   afterwards. The same test exists for every other `asmdb` subcommand and for
+   `asmd serve`.
 3. **`grep -rn "MkdirAll\|os.Mkdir" ./internal ./cmd` returns nothing.** This is
    a CI step, not a habit.
 4. A freshly initialised database has `PRAGMA application_id = 0x41534D30` and
    `PRAGMA user_version` equal to the number of embedded migrations. Assert both
    by reading the pragmas from a second, independent connection.
-5. `cmsdb migrate status` lists applied and pending migrations, and prints the
+5. `asmdb migrate status` lists applied and pending migrations, and prints the
    application ID and version it read.
 6. Applying migrations to an empty database and to a partially-migrated one both
    converge to the same schema. Test by comparing `sqlite_schema` dumps.
@@ -224,16 +226,17 @@ is about what these commands must refuse to do.
 8. `PRAGMA journal_mode` is `wal` on a persistent store.
 9. Concurrent writers do not produce `SQLITE_BUSY`: a test spawning 20
    goroutines each doing 50 writes passes under `-race`.
-10. **`cmsd serve` against a directory with no `cms.db` exits non-zero and binds
-   nothing.** Assert that no file was created and that nothing is listening.
-11. **`cmsd serve` against a file whose `application_id` is wrong exits non-zero
+10. **`asmd serve` against a directory with no `assemblage.db` exits non-zero
+   and binds nothing.** Assert that no file was created and that nothing is
+   listening.
+11. **`asmd serve` against a file whose `application_id` is wrong exits non-zero
    and binds nothing.** Two variants, both real failure modes: a zero-length
    file (`application_id` 0, which `sqlitemigration` would have adopted), and a
    valid SQLite database stamped with a different ID.
-12. **`cmsd serve` against a database one migration behind exits non-zero,
-   binds nothing, and leaves `user_version` unchanged.** The same for a database
-   one migration ahead. Assert the version afterwards — a server that migrated
-   and then failed for another reason must not pass this test.
+12. **`asmd serve` against a database one migration behind exits non-zero, binds
+   nothing, and leaves `user_version` unchanged.** The same for a database one
+   migration ahead. Assert the version afterwards — a server that migrated and
+   then failed for another reason must not pass this test.
 13. The error message for each of 10–12 names the expected and the actual value
    and the path it opened. A test asserts on the message, because these are the
    messages an operator reads at three in the morning.
@@ -254,7 +257,7 @@ credential columns on `users`, whose identity columns M1's first migration
 already created.
 `sessions(id, user_id, token_sha256, created_at, expires_at, last_seen_at)`.
 
-`sites` is here rather than in M3 because `cmsdb seed` creates one and because
+`sites` is here rather than in M3 because `asmdb seed` creates one and because
 `grants.site_id` points at it. The other four scope columns of `grants` —
 `category_id`/`category_deep`, `workflow_id`, `collection_id`, `document_id` —
 are **not** here: SQLite cannot add a foreign key to a column that already
@@ -269,10 +272,10 @@ the constraint attached. `internal/domain` carries the whole scope and
   no I/O. Scope matching including `category_deep` prefix semantics.
 - Anti-escalation check in the grant-writing path (`DESIGN.md` §7.3).
 - Password hashing, token generation, session store.
-- `cmsdb bootstrap admin`, `cmsdb seed` (roles and their grants, one site). The
+- `asmdb bootstrap admin`, `asmdb seed` (roles and their grants, one site). The
   default workflow the seed also owes arrives in M4, with the workflow tables —
   see M4's work list, which is where it is written down.
-- `cmsd serve` with `POST /api/v1/sessions`, `GET /api/v1/me`, auth middleware.
+- `asmd serve` with `POST /api/v1/sessions`, `GET /api/v1/me`, auth middleware.
 - `earl login`, `earl whoami`. `earl` defaults to the public origin
   (`https://htmx-app.localhost:8443` in development), not the Go listener.
 - Trusted-proxy middleware resolving the client IP from `X-Forwarded-For` only
@@ -288,7 +291,7 @@ the constraint attached. `internal/domain` carries the whole scope and
   `development`.
 
 **Acceptance.**
-1. `cmsdb bootstrap admin --email a@b.c --name Admin` prints a generated
+1. `asmdb bootstrap admin --email a@b.c --name Admin` prints a generated
    password exactly once; a second run exits non-zero and changes nothing.
 2. A password supplied on a command-line flag is rejected outright.
 3. `earl login` then `earl whoami` prints the bootstrapped admin, over the
@@ -385,9 +388,9 @@ comments exist" cannot refuse, and one that cannot refuse has not been tested.
 - `Do` in one transaction: check → update → event → enqueue. The enqueue step
   arrives with the queue in M6; there is no empty hook waiting for it.
 - The default story workflow of `DESIGN.md` §5.4 is seeded by the **migration**,
-  not by `cmsdb seed`: `documents.workflow_id` is `NOT NULL`, so no document
+  not by `asmdb seed`: `documents.workflow_id` is `NOT NULL`, so no document
   row may exist before a workflow does, and the rebuild has to place the rows
-  already there. `cmsdb seed` reports it.
+  already there. `asmdb seed` reports it.
 - API: `GET`/`POST /api/v1/documents/{uid}/transitions`, and `GET
   /api/v1/workflows` so a client can render a process it did not configure.
 - `earl doc transitions`, `earl doc do`.
@@ -464,10 +467,10 @@ after a worker dies.
   `Queue.Fail`, `Queue.ExtendLease`; a `Handler` registry keyed by kind; a
   worker loop with backoff.
 - A `noop` job kind for testing.
-- Workers hosted in `cmsd` behind `--workers N`.
+- Workers hosted in `asmd` behind `--workers N`.
 - API: `GET /api/v1/jobs`, `POST /api/v1/jobs/{id}/retry`.
 - `earl job list [--failed|--pending]`, `earl job retry`.
-- `cmsdb check` now reports leases held past expiry.
+- `asmdb check` now reports leases held past expiry.
 
 **Acceptance.**
 1. Twenty goroutines call `Claim` against one ready job; exactly one gets it.
@@ -526,7 +529,7 @@ now enforced.
 - `internal/render`: template lookup walking up the category tree, first match
   wins; `html/template` execution with a document context.
 - Three modes: publish, preview, validate.
-- Preview writes to a scratch tree and is served by `cmsd` under `/preview/`.
+- Preview writes to a scratch tree and is served by `asmd` under `/preview/`.
 - Media blobs content-addressed at `blobs/<sha[:2]>/<sha>`.
 - `earl` preview command opening or printing the rendered output.
 
@@ -576,7 +579,7 @@ up after itself.
    code.
 5. `documents.live_version_id` is set on success and unchanged on failure.
 6. A publish failure leaves no partial output and no orphaned resource rows.
-7. `cmsdb check` reports a resource row with no file on disk, and a file with no
+7. `asmdb check` reports a resource row with no file on disk, and a file with no
    row.
 
 **Out of scope.** Related assets. Remote distribution.
@@ -730,7 +733,7 @@ and somebody who is can be found.
 This is issue #6 rather than a milestone from the original plan. M0–M13 built an
 editorial system for a cast of people the database already held: five identity
 routes, none of which creates a user, and one — `POST /users/{uid}/roles` —
-which needs a uid nothing could produce. `cmsdb bootstrap admin` was the only
+which needs a uid nothing could produce. `asmdb bootstrap admin` was the only
 way in.
 
 **Work.**
@@ -750,7 +753,7 @@ way in.
   `earl user`.
 
 **Acceptance.**
-1. On a database seeded with nothing but `cmsdb bootstrap admin`, an
+1. On a database seeded with nothing but `asmdb bootstrap admin`, an
    administrator creates an invitation through `earl` and through the UI and is
    shown the link once, with a way to copy it.
 2. The link redeems exactly once, creating a user and landing them at `/login`
@@ -791,4 +794,5 @@ If scope must shrink, cut in this order, and say so in the release notes:
 
 **Never cut:** the version-pinning behaviour in M9, the shared `check` in M4,
 the lease in M6, or the resource diff in M9. Those are the four things that make
-this worth building rather than reaching for an off-the-shelf CMS.
+this worth building rather than reaching for an off-the-shelf content
+management system.

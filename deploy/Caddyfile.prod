@@ -17,7 +17,7 @@
 # reload work. Do not add `admin off` here: it would buy nothing on a droplet
 # where 2019 is not open to the internet, and it would cost the reload.
 
-cms.mdhenderson.com {
+assemblage.mdhenderson.com {
 	# TLS 1.3 or better is a requirement of the serving model (DESIGN.md 11),
 	# not a preference. Caddy's own default floor is 1.2, so say it.
 	# Certificates, renewal, and the HTTP->HTTPS redirect are Caddy's; asmd
@@ -59,13 +59,13 @@ cms.mdhenderson.com {
 	#
 	# And do not run `caddy validate` on this file as root. Validation loads
 	# the config, which opens the log writer, which creates
-	# cms.access.log owned by root:root 0600 -- after which the service fails
+	# assemblage.access.log owned by root:root 0600 -- after which the service fails
 	# to start with "permission denied" on a file that plainly exists, in a
 	# directory the caddy user can plainly write. If that has already happened:
 	#
 	#     sudo chown -R caddy:caddy /var/log/caddy
 	log {
-		output file /var/log/caddy/cms.access.log {
+		output file /var/log/caddy/assemblage.access.log {
 			roll_size 10MiB
 			roll_keep 10
 		}

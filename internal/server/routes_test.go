@@ -32,7 +32,7 @@ func newTestServer(t *testing.T, env config.Environment) *Server {
 }
 
 // TestDevRoutesAbsentByDefault is PLAN.md M0 acceptance 8, and it gates
-// release. With no --env and no CMS_ENV the environment resolves to
+// release. With no --env and no ASSEMBLAGE_ENV the environment resolves to
 // production, and every /__development/* path must 404 because nothing is
 // registered to answer it.
 func TestDevRoutesAbsentByDefault(t *testing.T) {

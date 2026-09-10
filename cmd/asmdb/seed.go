@@ -39,8 +39,8 @@ const (
 //
 // It deliberately does not track config.DefaultPublicOrigin any more, which it
 // did while nothing could change it. The two are different questions. The
-// public origin is where this CMS is reached -- cms.example.com, behind the
-// login -- and the site domain is where the content it publishes is read;
+// public origin is where this assemblage is reached -- www.example.com, behind
+// the login -- and the site domain is where the content it publishes is read;
 // on a real installation those are two hosts, and a default that made them look
 // like one taught the wrong lesson on the way in.
 //

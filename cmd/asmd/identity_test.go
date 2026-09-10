@@ -198,12 +198,12 @@ func TestDevLoginRoute(t *testing.T) {
 	}{
 		{
 			name: "the default environment",
-			env:  []string{"CMS_ENV="},
+			env:  []string{"ASSEMBLAGE_ENV="},
 			want: http.StatusNotFound,
 		},
 		{
 			name: "--env production",
-			env:  []string{"CMS_ENV="},
+			env:  []string{"ASSEMBLAGE_ENV="},
 			args: []string{"--env", "production"},
 			want: http.StatusNotFound,
 		},

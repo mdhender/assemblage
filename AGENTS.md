@@ -8,10 +8,8 @@ These instructions apply to the entire repository.
 - Agents are authorized to commit directly to `main` without asking for additional approval, provided the commit follows the versioning rules below.
 - Agents are authorized to push compliant commits to the upstream repository without asking for additional approval.
 - Assign every GitHub issue and pull request to `mdhender`.
-- When work is associated with a GitHub issue, reference and close that issue in the commit message, for example: `Fixes #1`.
-- Keep exactly one database migration file while the project is in alpha:
-  - Squash the imported migration history into a single initial migration before adding schema changes.
-  - After the squash, edit that single migration for schema changes instead of creating additional migration files.
+- When work is associated with a GitHub issue, reference (and/or close) that issue in the commit message, for example: `Fixes #1`.
+- Keep exactly one database migration file while the project is in alpha (edit that single migration for schema changes instead of creating additional migration files).
 
 ## Versioning
 

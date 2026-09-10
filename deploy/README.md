@@ -1,6 +1,6 @@
 # Assemblage Deployment
 
-`cmsd` speaks plain HTTP on loopback and never terminates TLS. A reverse proxy
+`asmd` speaks plain HTTP on loopback and never terminates TLS. A reverse proxy
 terminates it and guarantees TLS 1.3 or better. This is true in production and
 simulated in development, so there is one serving model rather than two.
 
@@ -26,18 +26,18 @@ failing at random and clearing it needs `sudo` keychain surgery.
 
 The service reads `/opt/homebrew/etc/Caddyfile`, which already terminates TLS
 for `https://htmx-app.localhost:8443` and proxies it to `127.0.0.1:18443`. Its
-CA lives in `/opt/homebrew/var/lib/caddy/pki/`. Start only `cmsd`:
+CA lives in `/opt/homebrew/var/lib/caddy/pki/`. Start only `asmd`:
 
 ```sh
 brew services list | grep caddy    # expect "started"; if not, ask a human
 mkdir -p var                       # no command creates a directory; this one is yours
-go run ./cmd/cmsdb init --db ./var                 # creates ./var/cms.db
-go run ./cmd/cmsd serve --db ./var --addr 127.0.0.1:18443 --env development --timeout 60m
+go run ./cmd/asmdb init --db ./var                 # creates ./var/assemblage.db
+go run ./cmd/asmd serve --db ./var --addr 127.0.0.1:18443 --env development --timeout 60m
 ```
 
-`--db` names an existing directory; the database inside it is always `cms.db`.
-`cmsd` neither creates nor migrates it, so a fresh checkout needs the `cmsdb
-init` line above once.
+`--db` names an existing directory; the database inside it is always
+`assemblage.db`. `asmd` neither creates nor migrates it, so a fresh checkout
+needs the `asmdb init` line above once.
 
 Open <https://htmx-app.localhost:8443/>.
 
@@ -47,7 +47,7 @@ bundles and will disagree with the macOS keychain.
 
 `--env development` enables the `/__development/*` routes, which let an
 automated agent log in without a password and stop the server over HTTP. There
-is no tag involved: the environment is the only switch, so `go run ./cmd/cmsd`
+is no tag involved: the environment is the only switch, so `go run ./cmd/asmd`
 works without a build step. In any other environment the routes are never
 registered. (The `production` tag under "Building for the server" is a
 placement check for release binaries; it gates no routes.) `--timeout` is
@@ -68,16 +68,16 @@ debugging the proxy itself.
 
 Any proxy that terminates TLS 1.3+, sets the standard forwarded headers, and
 passes `Origin` and `Sec-Fetch-*` through unmodified will do. The proxy owns
-TLS configuration, HSTS, HTTP→HTTPS redirection, and certificates. `cmsd` owns
+TLS configuration, HSTS, HTTP→HTTPS redirection, and certificates. `asmd` owns
 none of them.
 
-`deploy/Caddyfile.prod` and `deploy/nginx.conf` are worked examples of each,
-for `cms.mdhenderson.com`. `deploy/PROVISIONING.md` is the first-time setup of
-the droplet they run on; `deploy/cms.service` is the unit.
+`deploy/Caddyfile.prod` and `deploy/nginx.conf` are worked examples of each, for
+`assemblage.mdhenderson.com`. `deploy/PROVISIONING.md` is the first-time setup
+of the droplet they run on; `deploy/assemblage.service` is the unit.
 
-Everything `cmsd` needs is a flag, plus one environment variable. **There is no
+Everything `asmd` needs is a flag, plus one environment variable. **There is no
 configuration file.** `docs/DESIGN.md` §11 lists a `--config FILE`, and
-`cmd/cmsd/main.go` says in a comment where it would be read; it is not
+`cmd/asmd/main.go` says in a comment where it would be read; it is not
 implemented, and a flag that is parsed and ignored is worse than no flag. Until
 it exists, the unit file's `ExecStart` is the configuration:
 
@@ -87,30 +87,31 @@ it exists, the unit file's `ExecStart` is the configuration:
 | `--public-origin` | the browser-facing origin, scheme included |
 | `--trusted-proxy` | CIDRs the proxy connects from (default `127.0.0.1/32`, `::1/128` — already right when the proxy is on the same host) |
 | `--timeout` | optional graceful shutdown after a duration; `0`, the default, means never |
-| `--db` | the directory holding `cms.db`; it must already exist |
+| `--db` | the directory holding `assemblage.db`; it must already exist |
 | `--templates`, `--preview`, `--output` | optional directories that must already exist; without them the server renders, previews, and publishes nothing |
 | `--workers` | background job workers in this process; `0` disables them |
-| `$CMS_ENV` | `production` — see below |
+| `$ASSEMBLAGE_ENV` | `production` — see below |
 
-`CMS_ENV=development` on a server is a complete authentication bypass: it is
-what registers the `/__development/*` routes, and either of them logs anyone in
-as anyone. The environment is the only gate on those routes, so this one
+`ASSEMBLAGE_ENV=development` on a server is a complete authentication bypass: it
+is what registers the `/__development/*` routes, and either of them logs anyone
+in as anyone. The environment is the only gate on those routes, so this one
 variable carries the whole weight. Set it in the unit file. Never set it in an
 interactive shell profile, and never copy a development `.env` onto a server.
 
-CI asserts that a server started with no `--env` and no `CMS_ENV` returns 404
-for every `/__development/*` route, and that the same routes are live under
+CI asserts that a server started with no `--env` and no `ASSEMBLAGE_ENV` returns
+404 for every `/__development/*` route, and that the same routes are live under
 `--env development`; those assertions gate release.
 
 ## Building for the server
 
 Release binaries are built with `-tags production`. The tag adds one thing: a
 `buildenv.Verify()` that each `main` calls at startup, which **panics unless
-`CMS_ENV` is exported as exactly `production`**. Binaries built without the tag
-have the mirror check — they panic if `CMS_ENV` *is* `production`. A binary
-therefore cannot run on the wrong kind of machine without saying so
-immediately, in the logs, at startup, rather than quietly serving the wrong
-configuration. See `docs/DESIGN.md` §14, "The build/environment interlock".
+`ASSEMBLAGE_ENV` is exported as exactly `production`**. Binaries built without
+the tag have the mirror check — they panic if `ASSEMBLAGE_ENV` *is*
+`production`. A binary therefore cannot run on the wrong kind of machine without
+saying so immediately, in the logs, at startup, rather than quietly serving the
+wrong configuration. See `docs/DESIGN.md` §14, "The build/environment
+interlock".
 
 The tag gates **nothing else**. It adds no routes, removes no code, and changes
 no behaviour beyond that one assertion.
@@ -120,7 +121,7 @@ no behaviour beyond that one assertion.
 
 ```sh
 mkdir -p deploy/linux/amd64
-for c in cmsd cmsdb earl; do
+for c in asmd asmdb earl; do
     GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
         go build -tags production -trimpath -o deploy/linux/amd64/$c ./cmd/$c
 done
@@ -135,13 +136,14 @@ of the cost of the change.
 Ship them:
 
 ```sh
-rsync -av deploy/linux/amd64/ cms:/opt/cms/bin/
+rsync -av deploy/linux/amd64/ assemblage:/opt/assemblage/bin/
 ```
 
-`cms` is a `~/.ssh/config` host alias for the droplet — see `PROVISIONING.md`,
-step 1. There is deliberately no `--chmod=F755`: recent macOS ships openrsync,
-which rejects it, and `make release` already leaves the binaries `755` for
-`rsync -a` to preserve. `deploy/linux/` is build output and is not committed.
+`assemblage` is a `~/.ssh/config` host alias for the droplet — see
+`PROVISIONING.md`, step 1. There is deliberately no `--chmod=F755`: recent
+macOS ships openrsync, which rejects it, and `make release` already leaves the
+binaries `755` for `rsync -a` to preserve. `deploy/linux/` is build output and
+is not committed.
 
 **On a server that is already running, this `rsync` is not the first step.**
 "Deploying a new version" below has the order, which is neither a plain
@@ -152,8 +154,8 @@ with the database.
 Two checks worth doing once, on the server, before the first restart:
 
 ```sh
-/opt/cms/bin/cmsd version                 # expect: panics, CMS_ENV is not set
-CMS_ENV=production /opt/cms/bin/cmsd version
+/opt/assemblage/bin/asmd version                 # expect: panics, ASSEMBLAGE_ENV is not set
+ASSEMBLAGE_ENV=production /opt/assemblage/bin/asmd version
 ```
 
 The first panicking is the interlock working. If it prints a version instead,
@@ -173,31 +175,31 @@ Stop the service and take the backup **on the droplet, with the binaries that
 are already there**:
 
 ```sh
-sudo systemctl stop cms
-CMS_ENV=production /opt/cms/bin/cmsdb backup \
-  --db /opt/cms/var --to "/opt/cms/backups/cms-$(date +%F).db"
+sudo systemctl stop assemblage
+ASSEMBLAGE_ENV=production /opt/assemblage/bin/asmdb backup \
+  --db /opt/assemblage/var --to "/opt/assemblage/backups/assemblage-$(date +%F).db"
 ```
 
 Ship the new binaries, from the Mac:
 
 ```sh
-rsync -av deploy/linux/amd64/ cms:/opt/cms/bin/
-rsync -av --exclude=linux/ deploy/ cms:/opt/cms/deploy/
+rsync -av deploy/linux/amd64/ assemblage:/opt/assemblage/bin/
+rsync -av --exclude=linux/ deploy/ assemblage:/opt/assemblage/deploy/
 ```
 
 Migrate and start, on the droplet:
 
 ```sh
-CMS_ENV=production /opt/cms/bin/cmsdb migrate status --db /opt/cms/var
-CMS_ENV=production /opt/cms/bin/cmsdb migrate up --db /opt/cms/var
-sudo systemctl start cms
+ASSEMBLAGE_ENV=production /opt/assemblage/bin/asmdb migrate status --db /opt/assemblage/var
+ASSEMBLAGE_ENV=production /opt/assemblage/bin/asmdb migrate up --db /opt/assemblage/var
+sudo systemctl start assemblage
 ```
 
 **The order is the point, and three separate reasons hold it in place.**
 
 *The backup is taken before the upload because it should not depend on which
 binaries happen to be in place.* This step used to come after the upload, and
-on the first deploy that carried a migration it refused: `cmsdb backup` demanded
+on the first deploy that carried a migration it refused: `asmdb backup` demanded
 that the schema version match the number of migrations the binary embedded, and
 uploading first is what made those disagree. That refusal is gone — `backup` now
 asks only whether the file is this system's database (issue #25) — so either
@@ -209,15 +211,15 @@ that will fail again for a new reason.
 *The service is stopped before the backup so that the file is exactly the state
 the migration is about to act on.* `backup` does not need the service stopped —
 `VACUUM INTO` takes its own read transaction and runs happily against a live
-server — but a backup taken while `cmsd` is still accepting writes is a backup
+server — but a backup taken while `asmd` is still accepting writes is a backup
 missing whatever arrived between it and the stop. Those are the edits somebody
 would most want back.
 
-*The service starts last because it cannot start earlier.* `cmsd` requires
+*The service starts last because it cannot start earlier.* `asmd` requires
 `user_version` to equal the number of migrations it embeds and refuses to start
 otherwise (§13.4), so a new binary with a pending migration will not run — the
 intended behaviour, not a bug to work around. The stop has to bracket the
-migration anyway: `cmsdb` and `cmsd` would otherwise contend for the same SQLite
+migration anyway: `asmdb` and `asmd` would otherwise contend for the same SQLite
 write lock.
 
 The cost is that the `rsync` now happens inside the outage rather than before
@@ -230,7 +232,7 @@ to be invented while the site is off.
 the deploy log: a backup is a file nobody reads until the day it matters, and
 that is the wrong day to find out it is zero bytes.
 
-`/opt/cms/backups` must already exist — nothing in this system creates a
+`/opt/assemblage/backups` must already exist — nothing in this system creates a
 directory, and `PROVISIONING.md` §4 makes it. An existing file is refused
 rather than replaced, so a second deploy on the same day needs `--overwrite`
 and a moment's thought about which backup you would rather have.
@@ -238,7 +240,7 @@ and a moment's thought about which backup you would rather have.
 To verify a backup later, name it directly:
 
 ```sh
-CMS_ENV=production /opt/cms/bin/cmsdb check --file /opt/cms/backups/cms-2026-09-09.db
+ASSEMBLAGE_ENV=production /opt/assemblage/bin/asmdb check --file /opt/assemblage/backups/assemblage-2026-09-09.db
 ```
 
 That works on a backup taken at any schema, including one older than the
@@ -257,30 +259,30 @@ not ask for.
 command:
 
 ```sh
-sudo systemctl stop cms
-cp /opt/cms/backups/cms-2026-09-09.db /opt/cms/var/cms.db
-rm -f /opt/cms/var/cms.db-wal /opt/cms/var/cms.db-shm
-CMS_ENV=production /opt/cms/bin/cmsdb check --db /opt/cms/var
-sudo systemctl start cms
+sudo systemctl stop assemblage
+cp /opt/assemblage/backups/assemblage-2026-09-09.db /opt/assemblage/var/assemblage.db
+rm -f /opt/assemblage/var/assemblage.db-wal /opt/assemblage/var/assemblage.db-shm
+ASSEMBLAGE_ENV=production /opt/assemblage/bin/asmdb check --db /opt/assemblage/var
+sudo systemctl start assemblage
 ```
 
-Run those as `deploy`, which owns `/opt/cms` and is the account the unit runs
-as. Remove the write-ahead log and its index along with the database: they
-belong to the one being replaced, and leaving them beside a different one is
-the one way to turn a good backup into a corrupt database. The `check` before
+Run those as `deploy`, which owns `/opt/assemblage` and is the account the unit
+runs as. Remove the write-ahead log and its index along with the database: they
+belong to the one being replaced, and leaving them beside a different one is the
+one way to turn a good backup into a corrupt database. The `check` before
 starting is what tells you the restore landed. It also refuses outright if
-`user_version` does not match the binary in `/opt/cms/bin`, which is what
+`user_version` does not match the binary in `/opt/assemblage/bin`, which is what
 restoring across a migration produces: put back the binaries that go with the
 backup, or migrate the restored database up before starting.
 
 Migrations are append-only, and the beta exception that once permitted a squash
 is withdrawn (`DESIGN.md` §13.6). That is a promise to this server: the schema
 version only ever goes up, so a database here is always either current or
-behind, and behind is what `cmsdb migrate up` is for. Nothing on this machine
+behind, and behind is what `asmdb migrate up` is for. Nothing on this machine
 should ever write `PRAGMA user_version` — if a database appears to be *ahead* of
-the binaries in `/opt/cms/bin`, the binaries are the wrong ones, and the fix is
-to deploy the right ones rather than to touch the database.
+the binaries in `/opt/assemblage/bin`, the binaries are the wrong ones, and the
+fix is to deploy the right ones rather than to touch the database.
 
 If the unit file or a proxy config changed in the same push, install it from
-`/opt/cms/deploy/` and reload that service; the copies under `/etc` are meant
-to be diffable against the originals shipped there.
+`/opt/assemblage/deploy/` and reload that service; the copies under `/etc` are
+meant to be diffable against the originals shipped there.

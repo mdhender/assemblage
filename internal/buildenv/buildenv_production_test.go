@@ -12,8 +12,8 @@ import (
 // TestVerifyWithTag is the tagged half of PLAN.md M0 acceptance 14, run in CI
 // with "go test -tags production ./...".
 //
-// A release binary requires CMS_ENV to be set explicitly, because a server
-// should say what it is (DESIGN.md 14).
+// A release binary requires ASSEMBLAGE_ENV to be set explicitly, because a
+// server should say what it is (DESIGN.md 14).
 func TestVerifyWithTag(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -39,7 +39,7 @@ func TestVerifyWithTag(t *testing.T) {
 }
 
 // EnvVarForTest names the variable Verify reads.
-const EnvVarForTest = "CMS_ENV"
+const EnvVarForTest = "ASSEMBLAGE_ENV"
 
 func assertPanic(t *testing.T, want bool) {
 	t.Helper()
@@ -49,7 +49,7 @@ func assertPanic(t *testing.T, want bool) {
 		return
 	}()
 	if got != want {
-		t.Fatalf("Verify() panicked = %v, want %v (CMS_ENV=%q)", got, want, os.Getenv(EnvVarForTest))
+		t.Fatalf("Verify() panicked = %v, want %v (ASSEMBLAGE_ENV=%q)", got, want, os.Getenv(EnvVarForTest))
 	}
 }
 

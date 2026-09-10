@@ -337,10 +337,10 @@ func TestPreviewIsUnavailableWithoutTheFlags(t *testing.T) {
 	}
 }
 
-// TestCmsdRefusesAMissingTemplateTree is invariant 19 at the command
+// TestAsmdRefusesAMissingTemplateTree is invariant 19 at the command
 // boundary: --templates names a directory that must already exist, and asmd
 // says so while starting rather than on the first preview.
-func TestCmsdRefusesAMissingTemplateTree(t *testing.T) {
+func TestAsmdRefusesAMissingTemplateTree(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds three binaries")
 	}

@@ -5,13 +5,13 @@
 // domain types (DESIGN.md 13, invariant 2).
 //
 // Two entry points and one shared name. Both take a directory that must
-// already exist and join the constant cms.db to it (DESIGN.md 13.1):
+// already exist and join the constant assemblage.db to it (DESIGN.md 13.1):
 //
 //   - Create applies every migration to a database it brings into existence.
 //     "asmdb init" is its only caller, and it is the only place in this
 //     repository that names OpenCreate against a file.
 //   - Open verifies an existing database and never names OpenCreate, so a
-//     missing file is SQLITE_CANTOPEN rather than a new, empty CMS.
+//     missing file is SQLITE_CANTOPEN rather than a new, empty assemblage.
 //
 // The difference between them is the point. A server that creates a database
 // comes up healthy and empty; a server that migrates one upgrades production

@@ -171,8 +171,8 @@ func TestCommands(t *testing.T) {
 		}
 	})
 
-	// Acceptance 14, the untagged half, seen from outside: a binary built
-	// without the tag must refuse to run with CMS_ENV=production, and must be
+	// Acceptance 14, the untagged half, seen from outside: a binary built without
+	// the tag must refuse to run with ASSEMBLAGE_ENV=production, and must be
 	// content with anything else.
 	t.Run("interlock", func(t *testing.T) {
 		for name, path := range bin {
@@ -180,9 +180,9 @@ func TestCommands(t *testing.T) {
 				env      []string
 				wantExit bool
 			}{
-				{env: []string{"CMS_ENV="}, wantExit: false},
-				{env: []string{"CMS_ENV=development"}, wantExit: false},
-				{env: []string{"CMS_ENV=production"}, wantExit: true},
+				{env: []string{"ASSEMBLAGE_ENV="}, wantExit: false},
+				{env: []string{"ASSEMBLAGE_ENV=development"}, wantExit: false},
+				{env: []string{"ASSEMBLAGE_ENV=production"}, wantExit: true},
 			} {
 				_, stderr, code := run(t, path, tc.env, "version")
 				failed := code != 0
@@ -211,7 +211,7 @@ func TestCommands(t *testing.T) {
 	// Acceptance 8, at the process level and over a real socket. This one
 	// gates release.
 	t.Run("dev routes are 404 with the default environment", func(t *testing.T) {
-		proc := start(t, bin["asmd"], []string{"CMS_ENV="}, "serve", "--db", initDB(t, bin["asmdb"]), "--addr", "127.0.0.1:0", "--timeout", "30s")
+		proc := start(t, bin["asmd"], []string{"ASSEMBLAGE_ENV="}, "serve", "--db", initDB(t, bin["asmdb"]), "--addr", "127.0.0.1:0", "--timeout", "30s")
 
 		for _, path := range []string{"/__development/shut-it-down", "/__development/log-me-in/a@b.c"} {
 			resp, err := http.Get(proc.url + path)
@@ -221,7 +221,7 @@ func TestCommands(t *testing.T) {
 			_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
 			if resp.StatusCode != http.StatusNotFound {
-				t.Errorf("GET %s = %d, want 404 with no --env and no CMS_ENV", path, resp.StatusCode)
+				t.Errorf("GET %s = %d, want 404 with no --env and no ASSEMBLAGE_ENV", path, resp.StatusCode)
 			}
 		}
 
@@ -298,7 +298,7 @@ func TestGoRunWorksWithoutATag(t *testing.T) {
 	for _, name := range strings.Fields(commands) {
 		cmd := exec.Command("go", "run", "./cmd/"+name, "version")
 		cmd.Dir = repoRoot(t)
-		cmd.Env = append(os.Environ(), "CMS_ENV=")
+		cmd.Env = append(os.Environ(), "ASSEMBLAGE_ENV=")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Errorf("go run ./cmd/%s version: %v\n%s", name, err, out)

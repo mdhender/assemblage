@@ -18,7 +18,7 @@ import (
 // not a flag, not a configuration key, and not a parameter, so that --db
 // cannot address two different files depending on which command was typed
 // (DESIGN.md 13.1).
-const dbFileName = "cms.db"
+const dbFileName = "assemblage.db"
 
 // DefaultReadPoolSize is the number of reader connections. Readers are cheap
 // under WAL, where they do not block the writer and the writer does not block
@@ -191,12 +191,12 @@ func (db *DB) Tx(ctx context.Context, fn func(conn *sqlite.Conn) error) error {
 // still be reading from. Closing the writer first, which is what this did
 // until #11, left a read-only connection as the last one standing: SQLite
 // skipped the checkpoint it performs when the last connection to a database
-// closes, and cms.db-wal survived a clean shutdown byte for byte.
+// closes, and assemblage.db-wal survived a clean shutdown byte for byte.
 //
 // The explicit pragma is here rather than left to that implicit checkpoint
 // because the implicit one is best-effort and silent. It is skipped if the
 // lock cannot be taken and leaves no trace when it is skipped, and "a copy of
-// cms.db is a complete copy" is a promise this system makes to anybody
+// assemblage.db is a complete copy" is a promise this system makes to anybody
 // following deploy/README.md's instruction to back up before migrating.
 //
 // A checkpoint that fails is not a close that failed. Everything is committed
@@ -240,7 +240,7 @@ func (db *DB) CloseCheckpoint() Checkpoint { return db.closeCheckpoint }
 // TRUNCATE rather than PASSIVE or FULL: the weaker modes leave the log file in
 // place at its high-water mark, which still reads as "there is a write-ahead
 // log here" to an operator looking at the directory, and still has to be
-// copied alongside cms.db by anybody who does not know it is empty.
+// copied alongside assemblage.db by anybody who does not know it is empty.
 func checkpoint(conn *sqlite.Conn) Checkpoint {
 	c := Checkpoint{Ran: true}
 	err := sqlitex.ExecuteTransient(conn, "PRAGMA wal_checkpoint(TRUNCATE);", &sqlitex.ExecOptions{

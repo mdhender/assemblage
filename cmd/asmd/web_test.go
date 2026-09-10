@@ -60,7 +60,7 @@ func (b *browser) do(req *http.Request) (*http.Response, string) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	for _, c := range resp.Cookies() {
-		if strings.HasSuffix(c.Name, "cms_session") && c.Value != "" {
+		if strings.HasSuffix(c.Name, "assemblage_session") && c.Value != "" {
 			b.cookie = c
 		}
 	}

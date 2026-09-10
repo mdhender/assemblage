@@ -15,7 +15,7 @@ deploy/linux/
 /asmdb
 /earl
 
-# local database directory; --db names a directory, the file inside is cms.db
+# local database directory; --db names a directory, the file inside is assemblage.db
 var/
 
 # local env overrides; these hold secrets (see internal/dotenv)

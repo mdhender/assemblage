@@ -129,12 +129,12 @@ func (db *DB) Check(ctx context.Context, now time.Time) (*CheckReport, error) {
 }
 
 // CheckFile runs the same checks against a database file directly, without the
-// DIR/cms.db convention every other entry point here uses.
+// DIR/assemblage.db convention every other entry point here uses.
 //
-// It exists for the one database in this system that is not called cms.db in a
-// directory somebody named with --db: a backup, whose whole point is a
-// distinguishing name with a date in it (#10). Verifying one used to mean
-// moving it into a temporary directory under the expected name first.
+// It exists for the one database in this system that is not called
+// assemblage.db in a directory somebody named with --db: a backup, whose whole
+// point is a distinguishing name with a date in it (#10). Verifying one used to
+// mean moving it into a temporary directory under the expected name first.
 //
 // The connection is read-only and the journal mode is not checked. A file
 // written by VACUUM INTO comes out in rollback-journal mode whatever the

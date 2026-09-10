@@ -25,6 +25,7 @@ import (
 	"github.com/mdhender/assemblage/internal/buildenv"
 	"github.com/mdhender/assemblage/internal/clock"
 	"github.com/mdhender/assemblage/internal/config"
+	"github.com/mdhender/assemblage/internal/dotenv"
 	"github.com/mdhender/assemblage/internal/events"
 	"github.com/mdhender/assemblage/internal/jobs"
 	"github.com/mdhender/assemblage/internal/migrate"
@@ -39,6 +40,19 @@ import (
 const program = "asmd"
 
 func main() {
+	// ASSEMBLAGE_ENV selects which dotenv files load, and scopes the credential
+	// file. It is read before flag parsing because those files populate the
+	// environment we read, and it is resolved by internal/config so that the
+	// variable is named in one place. An unset, empty, or misspelled value
+	// resolves to production (DESIGN.md 14): the value that loads a
+	// developer's .env has to be the one somebody wrote down.
+	env := config.Resolve(config.Inputs{Env: config.FromEnv()}).Environment
+	// Load also rejects an unknown environment, which is what lets env be used
+	// as a path segment in the credential file without further checking.
+	if err := dotenv.Load(env.String()); err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %v\n", program, err)
+		os.Exit(1)
+	}
 	// Called explicitly, from main, never from init: main decides when the
 	// check runs, because it may want to handle version or --help first
 	// (invariant 18, DESIGN.md 14).
@@ -67,7 +81,7 @@ type flags struct {
 	// (invariant 14).
 	trustedProxies []string
 
-	// db is the directory holding cms.db. It is on serve and not on routes,
+	// db is the directory holding assemblage.db. It is on serve and not on routes,
 	// because the route table does not depend on it and a flag that is parsed
 	// and ignored is worse than no flag.
 	db string
@@ -120,7 +134,7 @@ type flags struct {
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           program,
-		Short:         "Serve the CMS API, the HTMX UI, and the job workers",
+		Short:         "Serve the assemblage API, the HTMX UI, and the job workers",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -157,7 +171,7 @@ func newServeCmd(f *flags) *cobra.Command {
 
 			// The database is opened and verified before anything binds a
 			// port. Every failure in DESIGN.md 13.4 — a missing directory, a
-			// missing cms.db, a wrong application_id, a schema version that is
+			// missing assemblage.db, a wrong application_id, a schema version that is
 			// not an exact match — returns here, with no listener and nothing
 			// created. An operator runs "asmdb migrate up" or fixes the path;
 			// asmd owns no way to repair it.
@@ -167,7 +181,7 @@ func newServeCmd(f *flags) *cobra.Command {
 			}
 			// The tail of the one shutdown path (invariant 17): this runs
 			// after Run has stopped accepting and drained, and it is where
-			// the write-ahead log is checkpointed back into cms.db.
+			// the write-ahead log is checkpointed back into assemblage.db.
 			//
 			// Logged, with the result, because the evidence that it did not
 			// happen is a file size an operator has no reason to look at
@@ -331,7 +345,7 @@ func newServeCmd(f *flags) *cobra.Command {
 	}
 	addServeFlags(cmd, f)
 	cmd.Flags().StringVar(&f.db, "db", "",
-		"directory holding cms.db; it must already exist, and asmd neither creates nor migrates it")
+		"directory holding assemblage.db; it must already exist, and asmd neither creates nor migrates it")
 	_ = cmd.MarkFlagRequired("db")
 	cmd.Flags().IntVar(&f.workers, "workers", jobs.DefaultWorkers,
 		"background job workers to run in this process; 0 disables them")
@@ -394,7 +408,7 @@ func newRoutesCmd(f *flags) *cobra.Command {
 // switch.
 func addServeFlags(cmd *cobra.Command, f *flags) {
 	cmd.Flags().StringVar(&f.env, "env", "",
-		"environment: development or production (default production; also $CMS_ENV)")
+		"environment: development or production (default production; also $ASSEMBLAGE_ENV)")
 	cmd.Flags().StringVar(&f.addr, "addr", config.DefaultAddr,
 		"address to listen on; loopback, and never TLS")
 	cmd.Flags().DurationVar(&f.timeout, "timeout", config.DefaultTimeout,

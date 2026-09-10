@@ -229,8 +229,8 @@ func TestBannerNamesTheSource(t *testing.T) {
 	}
 	s.WriteBanner()
 
-	if got := buf.String(); !strings.Contains(got, "source=CMS_ENV") {
-		t.Errorf("banner = %q, want it to name CMS_ENV as the source", got)
+	if got := buf.String(); !strings.Contains(got, "source="+config.EnvVar) {
+		t.Errorf("banner = %q, want it to name %s as the source", got, config.EnvVar)
 	}
 }
 

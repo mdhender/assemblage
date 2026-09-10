@@ -14,11 +14,11 @@ track of who did what.
 
 It is a greenfield Go program. It is **not** a port.
 
-The original Perl Bricolage CMS (`github.com/bricoleurs/bricolage`) is a *source
-of requirements and hard-won lessons*, not a specification. We reimplement
-behaviour we judged worth having and discard the rest. Where this document says
-"Bricolage does X", that is evidence about the problem domain, not an
-instruction to copy an implementation.
+The original Perl Bricolage content management system
+(`github.com/bricoleurs/bricolage`) is a *source of requirements and hard-won
+lessons*, not a specification. We reimplement behaviour we judged worth having
+and discard the rest. Where this document says "Bricolage does X", that is
+evidence about the problem domain, not an instruction to copy an implementation.
 
 Non-goals, stated up front so they do not creep in:
 
@@ -37,29 +37,25 @@ implement this document, but they are where the "why" is written down.
 
 ## 2. Constraints
 
-| Constraint | Value |
-|---|---|
-| Language | **Go 1.25 or later** — this is a hard floor, see below |
-| Database | SQLite, via `zombiezen.com/go/sqlite` |
-| Migrations | `zombiezen.com/go/sqlite/sqlitemigration` — `PRAGMA user_version`, never a table of our own |
-| Application ID | `0x41534D30` — ASCII `ASM0`, `1095978288` (§13.2) |
-| Database file | always `cms.db`, inside a directory `--db` names and nothing creates (§13.1) |
-| HTTP routing | standard library `net/http.ServeMux` only — **no third-party router** |
-| CSRF | standard library `net/http.CrossOriginProtection` (Go 1.25) |
-| Server-rendered UI | `html/template` + HTMX, as an API client (§3) |
-| Markdown, if needed | `github.com/yuin/goldmark` |
-| CLI framework | `github.com/spf13/cobra` — retained, already a dependency |
-| TLS | terminated by a reverse proxy, never by `cmsd` (§11) |
-| Licence | MIT; every Go file carries the existing header |
+| Constraint | Value | |---|---| | Language | **Go 1.25 or later** — this is a
+hard floor, see below | | Database | SQLite, via `zombiezen.com/go/sqlite` | |
+Migrations | `zombiezen.com/go/sqlite/sqlitemigration` — `PRAGMA user_version`,
+never a table of our own | | Application ID | `0x41534D30` — ASCII `ASM0`,
+`1095978288` (§13.2) | | Database file | always `assemblage.db`, inside a
+directory `--db` names and nothing creates (§13.1) | | HTTP routing | standard
+library `net/http.ServeMux` only — **no third-party router** | | CSRF | standard
+library `net/http.CrossOriginProtection` (Go 1.25) | | Server-rendered UI |
+`html/template` + HTMX, as an API client (§3) | | Markdown, if needed |
+`github.com/yuin/goldmark` | | CLI framework | `github.com/spf13/cobra` —
+retained, already a dependency | | TLS | terminated by a reverse proxy, never by
+`asmd` (§11) | | Licence | MIT; every Go file carries the existing header |
 
 Go 1.25 is the floor because `net/http.CrossOriginProtection` arrived in it.
 That is the CSRF defence for the HTMX UI and there is no reason to reimplement
 it. Do not lower the floor to accommodate an older toolchain.
 
-`pkg/way`, the third-party router in the repository today, is **removed and not
-replaced.** `net/http.ServeMux` has had method and wildcard patterns since
-Go 1.22, which is everything the route table in §12 needs. Delete the package;
-if any fragment survives, its attribution and licence survive with it.
+`net/http.ServeMux` has had method and wildcard patterns since
+Go 1.22, which is everything the route table in §12 needs.
 
 `cobra` stays. Three commands with subcommands is what it is for.
 
@@ -67,13 +63,13 @@ if any fragment survives, its attribution and licence survive with it.
 > before wiring it. The type exists in 1.25; the surface is small but worth
 > reading rather than guessing.
 
-SQLite is a deliberate choice, not a placeholder. A single-node CMS with a
-handful of editors and a background publisher has no workload that needs a
+SQLite is a deliberate choice, not a placeholder. A single-node assemblage with
+a handful of editors and a background publisher has no workload that needs a
 server database, and SQLite removes an entire class of operational burden. The
 design must not depend on features SQLite lacks, and must respect its
 single-writer model (§13).
 
-`cmsd` never terminates TLS and never listens on a public interface. It speaks
+`asmd` never terminates TLS and never listens on a public interface. It speaks
 plain HTTP on loopback behind Caddy or nginx, which guarantees TLS 1.3 or
 better. This has consequences for cookies, client addresses, and origin
 checking that are easy to get wrong — see §11.
@@ -133,8 +129,8 @@ may do and the function that does it are the same function (§6.2).
 
 ```
 cmd/
-  cmsdb/            database lifecycle command
-  cmsd/             server command
+  asmdb/            database lifecycle command
+  asmd/             server command
   earl/             API client command
 internal/
   domain/           entities, value types, invariants; no I/O
@@ -208,7 +204,7 @@ because two things have nowhere else to live. The first is the route table:
 `api`, `web`, and `web/devroutes` each own their handlers, but something has to
 decide which of them are mounted, and that decision *is* the gate on the
 development routes (§11). Building the table is a function rather than a side
-effect of serving, so `cmsd routes` prints the table the running configuration
+effect of serving, so `asmd routes` prints the table the running configuration
 actually produces instead of a second list that can drift from it — the same
 call registers the handlers and records the patterns. The second is the single
 graceful-shutdown path reached by `SIGTERM`, by `--timeout`, and by the
@@ -412,7 +408,7 @@ separate function, `ValidateContentShape`, and all it refuses is content no
 schema validator could parse.
 
 **An element type declaring no fields declares that a document of that type
-carries none**, and content carrying one is refused. That is why `cmsdb seed`
+carries none**, and content carrying one is refused. That is why `asmdb seed`
 writes a schema with a body and a deck in it rather than an empty field list: an
 empty declaration that accepted anything would be a schema saying one thing
 while the system does another, which is the shape invariant 6 is about.
@@ -473,7 +469,7 @@ is `UPDATE sites SET domain = ...` and no more — which is exactly why it needs
 `sites_domain UNIQUE` (0014) beside it, since a second site claiming the name
 would be a template lookup with two answers.
 
-It is mutable because it has to be. `cmsdb seed` writes a domain before anybody
+It is mutable because it has to be. `asmdb seed` writes a domain before anybody
 has said what the installation is called, and until issue #3 the alternatives
 were to name the production template directory after a development hostname or
 to rewrite the row by hand with `sqlite3`. `PATCH /api/v1/sites/{uid}` needs
@@ -614,10 +610,10 @@ draft ──submit──▶ review ──approve──▶ approved ──publish
 
 Plus `archive` from `draft`/`review`/`published`, and `restore` from `archived`.
 
-It is seeded by the **migration**, not by `cmsdb seed`. `documents.workflow_id`
+It is seeded by the **migration**, not by `asmdb seed`. `documents.workflow_id`
 is `NOT NULL` with a composite foreign key to `workflow_states`, so no document
 row may exist before a workflow does — and the migration that rebuilds
-`documents` has to place the rows already there. `cmsdb seed` reports what it
+`documents` has to place the rows already there. `asmdb seed` reports what it
 finds rather than declaring the process a second time: a state machine written
 down twice is a state machine that drifts.
 
@@ -1080,7 +1076,7 @@ a database.
 `domain.References` reads the declared fields of a checked-in version's content.
 Scanning the whole content tree for anything uid-shaped would publish a document
 because somebody quoted a uid in a paragraph, and reading `url` fields could not
-tell an internal reference from a link to somebody else's site. `cmsdb seed`
+tell an internal reference from a link to somebody else's site. `asmdb seed`
 declares `related` on the story type, repeatable, so the feature is reachable
 from a fresh database rather than waiting on an administrator.
 
@@ -1149,7 +1145,7 @@ CREATE TABLE published_resources (
 ) STRICT;
 ```
 
-`cmsd --output DIR` names the tree those files are written beneath, and the
+`asmd --output DIR` names the tree those files are written beneath, and the
 paths in `published_resources` are relative to it. It is optional, like
 `--templates` and `--preview`: a server started without it serves everything
 else and answers `503` to a publish, naming the flag it was not given. The
@@ -1181,9 +1177,9 @@ RETURNING uri, path;
 ```
 
 Without this, changing a cover date, category, or slug leaves the file at the
-old URI serving forever. Almost no CMS gets this right. **Build it with
-publishing, not after** — retrofitting means a reconciliation pass over an
-already-dirty output tree.
+old URI serving forever. Almost no content management system gets this right.
+**Build it with publishing, not after** — retrofitting means a reconciliation
+pass over an already-dirty output tree.
 
 The diff runs **per output channel**, within the channels the publish covers: a
 publish to the web channel must not expire what the print channel wrote, and a
@@ -1197,7 +1193,7 @@ already holds fails on the unique index before a single byte is written, and a
 write that fails rolls the rows back with it, so a failure leaves neither
 partial output nor an orphaned resource row.
 
-`cmsdb check --output DIR` reconciles the two, and reports the opposite
+`asmdb check --output DIR` reconciles the two, and reports the opposite
 mistakes separately: a resource row whose file is gone is a page the system
 believes it is serving and is not, and a file no row claims is a page nothing
 will ever expire. Without `--output` the check says the question was not asked
@@ -1224,7 +1220,7 @@ Templates are files on disk, in a tree that mirrors the tree it is searched by:
 <templates>/www.example.com/story.gohtml
 ```
 
-`cmsd --templates DIR` names the root, `--preview DIR` names the scratch tree,
+`asmd --templates DIR` names the root, `--preview DIR` names the scratch tree,
 and `--output DIR` names the published tree (§8.3). All three are optional —
 M0–M6 is a working editorial system with no publishing, and a server started
 without them serves everything else and answers `503` to a preview or a
@@ -1238,7 +1234,7 @@ above describes, and it is not decoration. Category paths are unique per site
 and not across sites: two sites both have `/features/`, and a tree without the
 site level would hand one site's templates to the other with nothing to notice.
 It is named by the site's domain because that is the key a person already types
-— `cmsdb seed` looks a site up by it — and because a directory named by a uid is
+— `asmdb seed` looks a site up by it — and because a directory named by a uid is
 a directory nobody can navigate.
 
 **Three modes**, as in the original: **publish** (bytes for the output tree),
@@ -1341,7 +1337,7 @@ an empty range. That is the cheaper half. `internal/store` asserts both halves
 with `EXPLAIN QUERY PLAN` over the statement it actually runs.
 
 `jobs_leased` answers "which leases are held past expiry", which is what
-`cmsdb check` reports; it is partial on the rows a lease is held over, so it is
+`asmdb check` reports; it is partial on the rows a lease is held over, so it is
 small by construction. `jobs_failed` is `earl job list --failed`.
 
 Claiming is one statement:
@@ -1367,7 +1363,7 @@ forever and recovery was a manual `UPDATE`. A lease expires on its own.
 document republish run at priority 5 without blocking an editor pressing
 Publish. Every bulk operation defaults to priority 5.
 
-Workers run inside `cmsd` by default (`--workers N`, default 1, `0` to disable).
+Workers run inside `asmd` by default (`--workers N`, default 1, `0` to disable).
 Long jobs must heartbeat by extending their lease.
 
 **Every write a worker makes names its lease.** Complete, fail, release, and
@@ -1510,35 +1506,36 @@ sends nothing; an installation that sends mail supplies its own.
 
 ## 11. The three commands
 
-### `cmsdb` — database lifecycle
+### `asmdb` — database lifecycle
 
 ```
-cmsdb init            --db DIR                create DIR/cms.db, apply all migrations
-cmsdb migrate status  --db DIR                show applied/pending
-cmsdb migrate up      --db DIR [--to N]       apply pending migrations
-cmsdb bootstrap admin --db DIR --email E --name N [--password-stdin]
-cmsdb seed            --db DIR [--demo] [--site-domain HOST]
+asmdb init            --db DIR                create DIR/assemblage.db, apply all migrations
+asmdb migrate status  --db DIR                show applied/pending
+asmdb migrate up      --db DIR [--to N]       apply pending migrations
+asmdb bootstrap admin --db DIR --email E --name N [--password-stdin]
+asmdb seed            --db DIR [--demo] [--site-domain HOST]
                                               roles, site, element types; reports the workflow
                                               --demo also queues one noop job to watch
-cmsdb check           --db DIR [--output DIR] integrity: FK check, orphaned resources, stuck leases
-cmsdb check           --file FILE             the same, on a database file under any name
-cmsdb backup          --db DIR --to FILE [--overwrite]
+asmdb check           --db DIR [--output DIR] integrity: FK check, orphaned resources, stuck leases
+asmdb check           --file FILE             the same, on a database file under any name
+asmdb backup          --db DIR --to FILE [--overwrite]
                                               a verified snapshot, taken while the server runs
-cmsdb vacuum          --db DIR
+asmdb vacuum          --db DIR
 ```
 
 **`--db` names an existing directory, and the database inside it is always
-`cms.db` (§13.1).** `cmsdb` never creates a directory: a missing `DIR` is a hard
-failure naming the directory, in every subcommand including `init`. `init` is
-the only subcommand permitted to create the database file, and it stamps the
-application ID `0x41534D30` while applying migrations; every other subcommand
-opens an existing database and fails if the application ID does not match.
+`assemblage.db` (§13.1).** `asmdb` never creates a directory: a missing `DIR` is
+a hard failure naming the directory, in every subcommand including `init`.
+`init` is the only subcommand permitted to create the database file, and it
+stamps the application ID `0x41534D30` while applying migrations; every other
+subcommand opens an existing database and fails if the application ID does not
+match.
 
 **How much the schema version has to match depends on what the subcommand is
 about to do**, and the application ID never negotiates. A subcommand that reads
 rows needs to know what the columns mean, so it requires the version to equal
 the number of migrations the binary embeds — that is `check --db`, and it is
-invariant 21 for `cmsd`. `migrate status` and `migrate up` accept a database
+invariant 21 for `asmd`. `migrate status` and `migrate up` accept a database
 that is behind, since reporting and applying pending migrations is their whole
 job. **`backup` and `check --file` accept any version**, because they copy and
 inspect a *file* and interpret none of its rows (issue #25): a backup outlives
@@ -1567,13 +1564,13 @@ Both are damage and both fail the check. Without `--output` it says the
 question was not asked, because "0 orphaned resources" from a check that never
 looked is the most misleading line a report could carry.
 
-`check --file FILE` runs the same checks on a database that is not `cms.db` in
-a directory somebody named with `--db`, read-only. That database is a backup,
-whose whole point is a distinguishing name with a date in it; verifying one
-used to mean moving it into a temporary directory under the expected name
-first. `--file` and `--output` are mutually exclusive: reconciling
-`published_resources` against an output tree is a question about the live
-system rather than about a snapshot of it.
+`check --file FILE` runs the same checks on a database that is not
+`assemblage.db` in a directory somebody named with `--db`, read-only. That
+database is a backup, whose whole point is a distinguishing name with a date in
+it; verifying one used to mean moving it into a temporary directory under the
+expected name first. `--file` and `--output` are mutually exclusive: reconciling
+`published_resources` against an output tree is a question about the live system
+rather than about a snapshot of it.
 
 `backup --to FILE` writes a **consistent snapshot of a live database** and
 verifies it before giving it the name that was asked for. It is `VACUUM INTO`,
@@ -1603,11 +1600,11 @@ Four rules, and each of them is a mistake somebody would otherwise make:
   zero bytes.
 
 **There is no restore command, on purpose.** Restoring is a `cp` onto
-`DIR/cms.db` with the service stopped, written out by a person who has stopped
-to think. Copying a file over a database a server is holding is not an
+`DIR/assemblage.db` with the service stopped, written out by a person who has
+stopped to think. Copying a file over a database a server is holding is not an
 operation worth making convenient, and the asymmetry is the point: the safe
 direction is the one that gets automated. What the snapshot has to be is a file
-`cmsd` can be pointed at, and it is — `VACUUM INTO` leaves it in
+`asmd` can be pointed at, and it is — `VACUUM INTO` leaves it in
 rollback-journal mode, and the `OpenWAL` flag every open here names converts it
 on the way in (invariant 22).
 
@@ -1618,18 +1615,18 @@ because an expired lease is not a lease. What it tells an operator is that
 something killed a worker and did not restart it — worth a line in a report,
 not worth paging somebody for.
 
-### `cmsd` — the server
+### `asmd` — the server
 
 ```
-cmsd serve --db DIR [--addr 127.0.0.1:18443] [--workers N] [--config FILE]
+asmd serve --db DIR [--addr 127.0.0.1:18443] [--workers N] [--config FILE]
            [--env development|production] [--timeout DURATION]
            [--templates DIR] [--preview DIR] [--output DIR]
-cmsd routes                       print the route table and exit
-cmsd version                      version, commit, Go version
+asmd routes                       print the route table and exit
+asmd version                      version, commit, Go version
 ```
 
-**`cmsd` never creates a directory, never creates a database, and never runs a
-migration.** It opens `DIR/cms.db`, requires the application ID to be
+**`asmd` never creates a directory, never creates a database, and never runs a
+migration.** It opens `DIR/assemblage.db`, requires the application ID to be
 `0x41534D30`, and requires `PRAGMA user_version` to equal the number of
 migrations the binary embeds. Any of those four conditions failing is a hard
 failure: one log line naming expected and actual, a non-zero exit, and no
@@ -1638,7 +1635,7 @@ listener. The reasoning and the exact checks are in §13.4.
 `--env` defaults to `production` (§14). `--timeout` shuts down gracefully after
 the given duration; `0`, the default, means never. The `/__development/*` routes
 require `--env development` and nothing else; see "Development affordances"
-below. `cmsd routes` prints the table the running configuration actually
+below. `asmd routes` prints the table the running configuration actually
 produces, so it is the way to ask whether they are registered.
 
 Serves four things from one process:
@@ -1663,14 +1660,14 @@ checkpoints the write-ahead log, and the order it closes in is what makes that
 possible; see §13.3. The result is logged, because the evidence that it did not
 happen is a file size nobody has a reason to look at.
 
-### Serving model: `cmsd` runs behind a reverse proxy
+### Serving model: `asmd` runs behind a reverse proxy
 
-**`cmsd` speaks plain HTTP on loopback and never terminates TLS.** A reverse
+**`asmd` speaks plain HTTP on loopback and never terminates TLS.** A reverse
 proxy — Caddy or nginx — terminates it and guarantees TLS 1.3 or better. That
 is true in production and simulated in development, so there is one serving
 model, not two.
 
-| | Public URL | `cmsd` listens on |
+| | Public URL | `asmd` listens on |
 |---|---|---|
 | Development | `https://htmx-app.localhost:8443/` | `127.0.0.1:18443` |
 | Production | the site's real origin | loopback, port from config |
@@ -1687,7 +1684,7 @@ production. If someone genuinely needs it, they can pass it explicitly.
 
 Four consequences that are easy to get wrong, and are therefore requirements:
 
-**1. The public origin is configuration, not inference.** `cmsd` is told its
+**1. The public origin is configuration, not inference.** `asmd` is told its
 external origin (`server.public_origin`, e.g.
 `https://htmx-app.localhost:8443`). It never derives it from the `Host` header
 alone. Absolute URLs, cookie domains, and the origin allowlist all come from
@@ -1714,7 +1711,7 @@ because a token is not sent ambiguously by a browser; a request carrying a
 bearer token is exempt, one carrying a session cookie is not.
 
 The proxy owns TLS configuration, HSTS, HTTP→HTTPS redirection, and certificate
-lifecycle. `cmsd` owns none of them and must not emit HSTS headers of its own.
+lifecycle. `asmd` owns none of them and must not emit HSTS headers of its own.
 
 ### Development affordances
 
@@ -1725,13 +1722,13 @@ oversight.
 The problem they solve: an agent cannot type a password into a prompt, cannot
 reliably stop a server it started in the background, and leaves orphaned
 processes behind when a session ends badly. Without these, every agent session
-accretes dead `cmsd` processes holding SQLite locks.
+accretes dead `asmd` processes holding SQLite locks.
 
 | Affordance | Form | Gated |
 |---|---|---|
 | Log in as an existing user, no password | `GET /__development/log-me-in/{email}?returnTo={url}` | yes |
 | Stop the server over HTTP | `GET` or `POST /__development/shut-it-down` | yes |
-| Stop the server after a duration | `cmsd serve --timeout 30m` | **no** |
+| Stop the server after a duration | `asmd serve --timeout 30m` | **no** |
 
 `--timeout` is not gated because it is not dangerous. It ships in every build.
 The two routes are gated, because either one is a complete authentication
@@ -1742,7 +1739,7 @@ bypass if it reaches production.
 **No build tag gates these routes.** An earlier draft of this design gated them
 on `-tags dev` as well as the environment. That is gone, deliberately. Such a
 tag means every local invocation has to go through
-`go build -tags dev -o bin/cmsd` first, which breaks `go run ./cmd/cmsd` — and
+`go build -tags dev -o bin/asmd` first, which breaks `go run ./cmd/asmd` — and
 `go run ./cmd/...` is how we run commands locally. A guard that makes the normal
 workflow impossible gets worked around, and a worked-around guard protects
 nothing.
@@ -1751,8 +1748,8 @@ The `production` tag described in §14 is not a counter-example and must not
 become one: it asserts where a binary is running and gates no code.
 
 So the environment is the only switch, and we accept the footgun that follows:
-**anyone who exports `CMS_ENV=development` on a production server exposes a
-complete authentication bypass.** That is a real risk and we are taking it
+**anyone who exports `ASSEMBLAGE_ENV=development` on a production server exposes
+a complete authentication bypass.** That is a real risk and we are taking it
 knowingly, in exchange for a development loop that does not fight us. What
 remains is three layers, and the last two exist precisely because the first one
 can be misconfigured.
@@ -1760,7 +1757,7 @@ can be misconfigured.
 **1. The environment is `development`.** The routes are registered *only* when
 the resolved environment is exactly `development` (§14). This is not a
 middleware that returns 404 — the handlers are never added to the mux, so
-`cmsd routes` shows the truth and there is no matched-then-rejected path to get
+`asmd routes` shows the truth and there is no matched-then-rejected path to get
 wrong. The default is `production`, and anything other than the exact string
 `development` — unset, empty, `dev`, `Development` — is `production`.
 
@@ -1773,7 +1770,7 @@ the real TCP peer, never `X-Forwarded-For` — is not loopback. Behind the proxy
 the peer is always loopback, so this does not help there; it exists to stop the
 routes answering a direct connection from another machine.
 
-**3. It is loud.** `cmsd serve` prints its environment on every start, in every
+**3. It is loud.** `asmd serve` prints its environment on every start, in every
 environment, so `environment=production` is greppable in a production log. When
 the dev routes are live it also prints:
 
@@ -1805,7 +1802,7 @@ Creates a session for an **existing** user, without a password.
 
 - It does **not** create accounts. An unknown email is a 404. This keeps the
   blast radius to accounts that already exist and matches what agents need:
-  `cmsdb bootstrap admin`, then log in as that admin.
+  `asmdb bootstrap admin`, then log in as that admin.
 - It writes a `session.dev_login` event with the email and the peer address.
   Invariant: every state change writes an event, and this is a state change.
   It is also exactly the line you want in the log during an incident.
@@ -1839,7 +1836,7 @@ from a goroutine after the flush.
 #### `--timeout <duration>`
 
 ```
-cmsd serve --timeout 30m
+asmd serve --timeout 30m
 ```
 
 After the duration, shut down gracefully through the same path. Default `0`,
@@ -1854,14 +1851,14 @@ stop a server that its own operator configured to stop.
 #### The rule
 
 **A default-environment server exposes none of these routes, and CI proves it.**
-A test starts the server with no `--env` and no `CMS_ENV` and asserts that
-`/__development/log-me-in/anyone@example.com` and
+A test starts the server with no `--env` and no `ASSEMBLAGE_ENV` and asserts
+that `/__development/log-me-in/anyone@example.com` and
 `/__development/shut-it-down` both return `404`; a companion test asserts they
-are live under `--env development`, so the first test cannot pass merely
-because the feature broke. If either fails, the build is not shippable.
+are live under `--env development`, so the first test cannot pass merely because
+the feature broke. If either fails, the build is not shippable.
 
-Deployment configuration is where the remaining risk lives. Release binaries
-are built `-tags production` and require `CMS_ENV=production` to be exported
+Deployment configuration is where the remaining risk lives. Release binaries are
+built `-tags production` and require `ASSEMBLAGE_ENV=production` to be exported
 (§14, "The build/environment interlock"), which makes the correct value the one
 the server cannot start without. Set it in the unit file, never in an
 interactive shell profile, and never copy a development `.env` to a server.
@@ -2083,7 +2080,7 @@ that was already *redeemed* is a 409 — the account exists, and this operation
 would not remove it (that is §7's deactivation, which does not exist yet).
 
 **`GET /users` exists because `POST /users/{uid}/roles` needs a uid.** Before
-it, the only uid obtainable was the one `cmsdb bootstrap admin` prints at
+it, the only uid obtainable was the one `asmdb bootstrap admin` prints at
 creation, so the one identity write in the API could not be used on anybody
 else. Reading the list of accounts is a system-wide question with no document to
 scope it to, so it needs `read` over the **system subject** — the rule the job
@@ -2309,28 +2306,28 @@ cheerfully willing to create a database nobody asked for.
 ### 13.1 Where the database lives
 
 **A store path names a directory that already exists. The database file inside
-it is always `cms.db`.**
+it is always `assemblage.db`.**
 
 ```
-cmsdb init  --db ./var       creates ./var/cms.db    fails if ./var is missing
-cmsd  serve --db ./var       opens   ./var/cms.db    fails if either is missing
+asmdb init  --db ./var       creates ./var/assemblage.db    fails if ./var is missing
+asmd  serve --db ./var       opens   ./var/assemblage.db    fails if either is missing
 ```
 
 The file name is a constant in `internal/store`. It is not a flag, not a
 configuration key, and not a parameter, so `--db` cannot address two different
 files depending on which command was typed.
 
-**Nothing in this system ever creates a directory.** Not `cmsdb`, not `cmsd`,
+**Nothing in this system ever creates a directory.** Not `asmdb`, not `asmd`,
 not a test helper, not a convenience wrapper. `os.Mkdir` and `os.MkdirAll` do
 not appear anywhere in the database path. A missing directory is a hard failure
 that names the directory and exits non-zero; creating it is a human's decision.
 
 The reason is that a mistyped path is the most common way to end up with a
-second, empty database that looks exactly like the first. `cmsd serve --db
-./vsr` must stop, not quietly stand up an empty CMS in a directory that did not
-exist a moment earlier. A tool that creates what it cannot find turns a typo
-into a plausible-looking system with nothing in it, and the mistake surfaces
-hours later as "where did everything go".
+second, empty database that looks exactly like the first. `asmd serve --db
+./vsr` must stop, not quietly stand up an empty assemblage in a directory that
+did not exist a moment earlier. A tool that creates what it cannot find turns a
+typo into a plausible-looking system with nothing in it, and the mistake
+surfaces hours later as "where did everything go".
 
 ### 13.2 Application ID and schema version
 
@@ -2350,10 +2347,10 @@ A second record of the schema version is a second thing that can disagree with
 the database.
 
 One property of `sqlitemigration` matters enough to write down, because it is
-the gap `cmsd` has to close itself: its application-ID check accepts a database
+the gap `asmd` has to close itself: its application-ID check accepts a database
 whose ID is `0` **when the database has no schema at all**, so that it can adopt
-a freshly created empty file. That is right for `cmsdb init` and wrong for
-`cmsd`, which must reject an empty file rather than adopt it. See §13.4.
+a freshly created empty file. That is right for `asmdb init` and wrong for
+`asmd`, which must reject an empty file rather than adopt it. See §13.4.
 
 ### 13.3 Connections
 
@@ -2363,21 +2360,22 @@ a freshly created empty file. That is right for `cmsdb init` and wrong for
   whole life while the rest of the process looks correct.
 - **WAL mode on persistent stores.** An in-memory database has no WAL; asking
   for it there is a no-op at best.
-- **The pool closes readers first, then checkpoints, then closes the writer.**
-  A checkpoint is a write to the main database file, so it needs the write
+- **The pool closes readers first, then checkpoints, then closes the writer.** A
+  checkpoint is a write to the main database file, so it needs the write
   connection still open — and the readers have to be gone first, because a
   `TRUNCATE` checkpoint cannot reclaim a log another connection may still be
   reading. Closing the writer first leaves a read-only connection as the last
-  one standing, SQLite skips the checkpoint it performs when the last
-  connection closes, and `cms.db-wal` survives a clean shutdown byte for byte.
-  The checkpoint is then made explicitly with `PRAGMA wal_checkpoint(TRUNCATE)`
+  one standing, SQLite skips the checkpoint it performs when the last connection
+  closes, and `assemblage.db-wal` survives a clean shutdown byte for byte. The
+  checkpoint is then made explicitly with `PRAGMA wal_checkpoint(TRUNCATE)`
   rather than left to that implicit one, which is best-effort and silent: it is
   skipped when the lock cannot be taken and leaves no trace when it is skipped.
-  The property being reached for is that **after a graceful stop, `cms.db` on
-  its own is a complete copy** — which is the backup `deploy/README.md` tells an
-  operator to take. A checkpoint that fails is a warning and never a failure of
-  the close: everything is committed either way, and the log is replayed by the
-  next open, which is also what has to keep working after a `SIGKILL`.
+  The property being reached for is that **after a graceful stop,
+  `assemblage.db` on its own is a complete copy** — which is the backup
+  `deploy/README.md` tells an operator to take. A checkpoint that fails is a
+  warning and never a failure of the close: everything is committed either way,
+  and the log is replayed by the next open, which is also what has to keep
+  working after a `SIGKILL`.
 - **`busy_timeout` on every connection.**
 - **Open flags are always explicit.** The zero value of
   `sqlitex.PoolOptions.Flags` and the no-flag form of `sqlite.OpenConn` both
@@ -2392,7 +2390,7 @@ a freshly created empty file. That is right for `cmsdb init` and wrong for
 `internal/store` exposes a create path and an open path, and the difference
 between them is the point:
 
-| | `cmsdb` | `cmsd` |
+| | `asmdb` | `asmd` |
 |---|---|---|
 | Create a directory | never | never |
 | Create the database file | `init` only | **never** |
@@ -2400,22 +2398,23 @@ between them is the point:
 | Verify the application ID | yes | yes |
 | Verify the schema version | yes | yes, exact match |
 
-`cmsd` opens an existing database and verifies it. Each of the following is a
+`asmd` opens an existing database and verifies it. Each of the following is a
 hard failure: log one line naming the expected and the actual value, exit
 non-zero, serve nothing.
 
 1. **The directory does not exist.**
-2. **`cms.db` does not exist inside it.** `cmsd` opens without `OpenCreate`, so
-   SQLite returns `SQLITE_CANTOPEN`; detect it by result code (invariant 11),
-   never by matching the message.
+2. **`assemblage.db` does not exist inside it.** `asmd` opens without
+   `OpenCreate`, so SQLite returns `SQLITE_CANTOPEN`; detect it by result code
+   (invariant 11), never by matching the message.
 3. **`PRAGMA application_id` is not `0x41534D30`.** This catches the empty file,
-   a file belonging to another program, and a file belonging to a different CMS.
+   a file belonging to another program, and a file belonging to a different
+   content management system.
 4. **`PRAGMA user_version` is not exactly the number of migrations the binary
    embeds.** Ahead means the binary is older than the database; behind means a
-   migration is pending. Both are wrong, and neither is `cmsd`'s to repair — the
-   operator runs `cmsdb migrate up` or deploys the matching binary.
+   migration is pending. Both are wrong, and neither is `asmd`'s to repair — the
+   operator runs `asmdb migrate up` or deploys the matching binary.
 
-`cmsd` therefore never calls `sqlitemigration.NewPool` or
+`asmd` therefore never calls `sqlitemigration.NewPool` or
 `sqlitemigration.Migrate`, both of which migrate. It opens with
 `sqlitex.NewPool` and performs the four checks itself.
 
@@ -2460,11 +2459,11 @@ procedure. So the only way the number can move is by applying a migration, and
 with append-only in force it moves in one direction and never revisits a value.
 A squash would have broken exactly that: it lowers the count while every
 deployed database keeps the old one, which leaves those databases permanently
-*ahead* of the binary, refused by §13.4 and unreachable by `cmsdb migrate up` —
+*ahead* of the binary, refused by §13.4 and unreachable by `asmdb migrate up` —
 and unrepairable, because repairing it would mean writing `user_version` by
 hand.
 
-`cmsdb init` against a fresh directory was the recovery from a squash, and it
+`asmdb init` against a fresh directory was the recovery from a squash, and it
 was a complete answer for exactly as long as no database held anything worth
 keeping.
 
@@ -2477,19 +2476,20 @@ differ between a developer's machine and a real deployment.
 environment  development | production        default: production
 ```
 
-Sources, in precedence order: `--env`, `$CMS_ENV`, the config file, then the
-default. **The default is `production`**, which is the fail-safe direction: an
-unset or misspelled value never accidentally unlocks anything. Never infer the
-environment from a hostname, a listen address, or whether a terminal is
+Sources, in precedence order: `--env`, `$ASSEMBLAGE_ENV`, the config file, then
+the default. **The default is `production`**, which is the fail-safe direction:
+an unset or misspelled value never accidentally unlocks anything. Never infer
+the environment from a hostname, a listen address, or whether a terminal is
 attached.
 
 This setting carries more weight than it looks like it does. Since there is no
 build tag on the `/__development/*` routes (§11), it is the *only* thing
 standing between a deployment and an authentication bypass. Treat every change
 to how it resolves as a security change. The build/environment interlock below
-narrows the window — a release binary refuses to start unless `CMS_ENV` is
-exported as `production` — but it does not close it: nothing stops an operator
-from exporting `development` and running a binary built without the tag.
+narrows the window — a release binary refuses to start unless `ASSEMBLAGE_ENV`
+is exported as `production` — but it does not close it: nothing stops an
+operator from exporting `development` and running a binary built without the
+tag.
 
 It governs:
 
@@ -2509,7 +2509,7 @@ and parsed once in both environments (§12, "The HTML UI").
 considered and rejected: more states mean more combinations nobody tests, and
 anything that is not a developer's laptop should behave like production.
 
-`cmsd serve` logs its environment on every start, in both environments, so the
+`asmd serve` logs its environment on every start, in both environments, so the
 value is greppable in a log rather than inferred from a run script.
 
 **The build/environment interlock.** One build tag exists, `production`, and it
@@ -2523,11 +2523,11 @@ is built without it.
 
 package buildenv
 
-// Verify panics unless CMS_ENV is exported as exactly "production".
+// Verify panics unless ASSEMBLAGE_ENV is exported as exactly "production".
 func Verify() {
-	if v := os.Getenv("CMS_ENV"); v != "production" {
+	if v := os.Getenv("ASSEMBLAGE_ENV"); v != "production" {
 		panic(fmt.Sprintf(
-			"buildenv: built with -tags production, which requires CMS_ENV=production; got %q", v))
+			"buildenv: built with -tags production, which requires ASSEMBLAGE_ENV=production; got %q", v))
 	}
 }
 ```
@@ -2538,11 +2538,11 @@ func Verify() {
 
 package buildenv
 
-// Verify panics if CMS_ENV is exported as "production". Any other value,
+// Verify panics if ASSEMBLAGE_ENV is exported as "production". Any other value,
 // including unset, is fine.
 func Verify() {
-	if v := os.Getenv("CMS_ENV"); v == "production" {
-		panic("buildenv: built without -tags production and must not run with CMS_ENV=production")
+	if v := os.Getenv("ASSEMBLAGE_ENV"); v == "production" {
+		panic("buildenv: built without -tags production and must not run with ASSEMBLAGE_ENV=production")
 	}
 }
 ```
@@ -2555,27 +2555,27 @@ where it belongs. Call it before the process does any real work.
 
 Three things about this that are easy to get wrong:
 
-- **It reads the exported `CMS_ENV` only** — not the resolved `environment`
-  from §14's precedence chain. That is the point. This guard answers "is this
-  binary on the machine it was built for", and it answers it before flags, the
-  config file, or defaults have been consulted. A development binary run with
-  `--env production` still resolves to `production` and still refuses to
-  register the dev routes; the interlock simply does not have an opinion about
-  it.
+- **It reads the exported `ASSEMBLAGE_ENV` only** — not the resolved
+  `environment` from §14's precedence chain. That is the point. This guard
+  answers "is this binary on the machine it was built for", and it answers it
+  before flags, the config file, or defaults have been consulted. A development
+  binary run with `--env production` still resolves to `production` and still
+  refuses to register the dev routes; the interlock simply does not have an
+  opinion about it.
 - **It never gates a route or a feature.** The `/__development/*` routes are
   gated on the resolved environment and nothing else (§11). Do not reach for
   this tag to hide code — that is the design we removed, and it comes back with
   the same broken `go run` workflow it had the first time.
 - **The two guards compose.** A release binary demands
-  `CMS_ENV=production`, which resolves the environment to `production`, which
-  means the dev routes are never registered. The interlock does not replace the
-  runtime gate; it makes the misconfiguration that would defeat the runtime
-  gate fail loudly at startup instead of quietly at request time.
+  `ASSEMBLAGE_ENV=production`, which resolves the environment to `production`,
+  which means the dev routes are never registered. The interlock does not
+  replace the runtime gate; it makes the misconfiguration that would defeat the
+  runtime gate fail loudly at startup instead of quietly at request time.
 
 The asymmetry is intentional. The release binary requires the value to be set
 explicitly, because a server should say what it is. The ordinary binary only
 rejects the one value it must never see, because requiring developers to export
-anything to run `go run ./cmd/cmsd` is how you end up with a shell profile that
+anything to run `go run ./cmd/asmd` is how you end up with a shell profile that
 exports it everywhere.
 
 **Time.** `internal/clock` defines `type Clock interface { Now() time.Time }`.
@@ -2662,9 +2662,9 @@ header twice.
 - **`domain` is unit tested exhaustively.** It is pure; there is no excuse.
   Table-driven, including every guard and every URI format case.
 - **`store` is tested against a real SQLite database**, in-memory, with all
-  migrations applied by the same code path `cmsdb` uses. Not a mock. An
+  migrations applied by the same code path `asmdb` uses. Not a mock. An
   in-memory store goes through the create path — it is the one place a database
-  comes into existence without `cmsdb init` — and it still sets
+  comes into existence without `asmdb init` — and it still sets
   `foreign_keys = ON` on every connection (§13.3). A test that passes because
   foreign keys were off is worse than no test.
 - **`service` is tested through its public methods** with a real store and a
@@ -2674,9 +2674,9 @@ header twice.
   shape.
 - **Golden files** for rendering and for `earl --json` output. Regenerate with
   `go test ./... -update`.
-- **One end-to-end test per milestone**, driving `earl` against a `cmsd` on a
+- **One end-to-end test per milestone**, driving `earl` against a `asmd` on a
   temporary database. The harness uses `t.TempDir()` — which already exists —
-  and runs `cmsdb init` against it. **No test helper calls `os.MkdirAll`**, and
+  and runs `asmdb init` against it. **No test helper calls `os.MkdirAll`**, and
   no test reaches past `store` to create a database some other way; a helper
   that creates what the commands refuse to create is a hole in the rule big
   enough to walk the production code through.
@@ -2709,4 +2709,5 @@ Named here so they do not arrive by accident.
 
 Assemblage is the project name. Its repository and Go module are both
 `github.com/mdhender/assemblage`. References to Bricolage in this document mean
-the original Perl CMS at `github.com/bricoleurs/bricolage`, not this project.
+the original Perl implementation at `github.com/bricoleurs/bricolage`, not this
+project.

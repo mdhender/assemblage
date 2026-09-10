@@ -17,8 +17,9 @@
 // Every file written is remembered, and a republish diffs the addresses it now
 // produces against the addresses it produced before. Without that, changing a
 // cover date, a slug, or a category leaves the file at the old URI serving
-// forever -- almost no CMS gets this right, and retrofitting it means a
-// reconciliation pass over an already-dirty output tree (DESIGN.md 8.3).
+// forever -- almost no content management system gets this right, and
+// retrofitting it means a reconciliation pass over an already-dirty output tree
+// (DESIGN.md 8.3).
 //
 // A URI collision is detected by SQLITE_CONSTRAINT_UNIQUE on
 // UNIQUE (output_channel_id, uri) and never by matching message text

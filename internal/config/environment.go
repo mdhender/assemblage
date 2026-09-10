@@ -23,7 +23,7 @@ const (
 
 // EnvVar is the environment variable consulted by Resolve, and the same one the
 // build/environment interlock reads (DESIGN.md 14).
-const EnvVar = "CMS_ENV"
+const EnvVar = "ASSEMBLAGE_ENV"
 
 // IsDevelopment reports whether the development affordances are enabled. This
 // is the only question the rest of the system should ask. In particular it is
@@ -53,12 +53,12 @@ const (
 // is attached. The environment is never inferred from any of them.
 type Inputs struct {
 	Flag string // --env, highest precedence
-	Env  string // $CMS_ENV
+	Env  string // $ASSEMBLAGE_ENV
 	File string // the environment key in the config file
 }
 
-// FromEnv reads the raw CMS_ENV value. Call it when building Inputs, so that
-// Resolve itself stays a pure function of its argument.
+// FromEnv reads the raw ASSEMBLAGE_ENV value. Call it when building Inputs, so
+// that Resolve itself stays a pure function of its argument.
 func FromEnv() string { return os.Getenv(EnvVar) }
 
 // Resolution is the outcome of Resolve: the environment, where it came from,
@@ -70,20 +70,21 @@ type Resolution struct {
 	Recognized  bool   // whether Raw was exactly "development" or "production"
 }
 
-// Resolve applies the precedence chain from DESIGN.md 14: --env, then $CMS_ENV,
-// then the config file, then the default. The default is production, which is
-// the fail-safe direction — an unset or misspelled value never accidentally
-// unlocks anything.
+// Resolve applies the precedence chain from DESIGN.md 14: --env, then
+// $ASSEMBLAGE_ENV, then the config file, then the default. The default is
+// production, which is the fail-safe direction — an unset or misspelled value
+// never accidentally unlocks anything.
 //
 // Two rules do the work, and both matter:
 //
 //   - The highest source that supplies any value at all wins, even if that
-//     value is not a recognized environment. A set-but-misspelled CMS_ENV does
-//     not fall through to a config file that says "development"; falling
-//     through is how a typo unlocks the thing the typo was supposed to gate.
-//   - A value is "development" only if it is exactly that string. Anything
-//     else — "dev", "Development", " development", "" — is production. No
-//     trimming, no case folding, no synonyms.
+//     value is not a recognized environment. A set-but-misspelled
+//     ASSEMBLAGE_ENV does not fall through to a config file that says
+//     "development"; falling through is how a typo unlocks the thing the typo
+//     was supposed to gate.
+//   - A value is "development" only if it is exactly that string. Anything else
+//     — "dev", "Development", " development", "" — is production. No trimming,
+//     no case folding, no synonyms.
 //
 // Together they mean the only way to reach Development is to have written it
 // out exactly, in the highest source that has an opinion.

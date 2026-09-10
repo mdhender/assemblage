@@ -1,13 +1,13 @@
 # Provisioning Assemblage on a production droplet
 
-This is the first-time setup for `cms.mdhenderson.com` on a DigitalOcean
+This is the first-time setup for `assemblage.mdhenderson.com` on a DigitalOcean
 droplet: the machine, the SSH keys, the directory layout, the reverse proxy,
 and the first deploy. Do it once. Afterwards, `deploy/README.md`, "Deploying a
 new version", is the whole of the routine.
 
 The shape being built is the one `docs/DESIGN.md` §11 requires: a reverse proxy
-terminating TLS on the public interface, and `cmsd` speaking plain HTTP on
-loopback behind it, on the same droplet. `cmsd` never terminates TLS, never
+terminating TLS on the public interface, and `asmd` speaking plain HTTP on
+loopback behind it, on the same droplet. `asmd` never terminates TLS, never
 creates a directory, and never migrates a database. Every step below that looks
 like busywork — the `mkdir` list, the ordering of migrate and restart — is
 there because the application deliberately refuses to do it for you.
@@ -39,10 +39,10 @@ ssh-add --apple-use-keychain ~/.ssh/id_ed25519_mdhenderson
 ```
 
 Then name the host once, in `~/.ssh/config`, so that every command in this
-document and in `README.md` can say `cms` and mean the same thing:
+document and in `README.md` can say `assemblage` and mean the same thing:
 
 ```
-Host cms
+Host assemblage
     HostName 203.0.113.10          # the droplet's IPv4 address
     User deploy
     IdentityFile ~/.ssh/id_ed25519_mdhenderson
@@ -55,7 +55,7 @@ next step is where it is made, and until then connect explicitly as
 
 ## 2. DNS
 
-Point `cms.mdhenderson.com` at the droplet before going any further. Both
+Point `assemblage.mdhenderson.com` at the droplet before going any further. Both
 proxies below obtain a certificate by proving control of the name over port 80,
 and neither can do that while the record is missing or stale.
 
@@ -64,7 +64,7 @@ enabled it (both proxy configs listen on `[::]`). Confirm from the Mac before
 continuing, and ask a resolver that is not your cache:
 
 ```sh
-dig +short cms.mdhenderson.com @1.1.1.1
+dig +short assemblage.mdhenderson.com @1.1.1.1
 ```
 
 ## 3. The deploy user, and closing the front door
@@ -103,18 +103,19 @@ visudo -c                                   # the whole set, including the new f
 permissions, and it ignores any filename containing a `.` or ending in `~`, so
 do not name it `deploy.conf`.
 
-`deploy` owns `/opt/cms` and runs the service. On a droplet with one operator
-that is the right number of accounts. If more than one person ever deploys,
-split it: a `cms` system account that runs the unit and cannot write
-`/opt/cms/bin`, and a `deploy` account that can. That is a one-line change to
-`User=` in the unit plus the ownership of the binaries, and it is worth doing
-at the point where "who pushed that binary" stops having an obvious answer.
+`deploy` owns `/opt/assemblage` and runs the service. On a droplet with one
+operator that is the right number of accounts. If more than one person ever
+deploys, split it: an `assemblage` system account that runs the unit and cannot
+write `/opt/assemblage/bin`, and a `deploy` account that can. That is a one-line
+change to `User=` in the unit plus the ownership of the binaries, and it is
+worth doing at the point where "who pushed that binary" stops having an obvious
+answer.
 
 Now confirm — **from a second terminal, before closing the first** — that
-`ssh cms` lands as `deploy` and that sudo works without a prompt:
+`ssh assemblage` lands as `deploy` and that sudo works without a prompt:
 
 ```sh
-ssh cms 'id -un; sudo -n id -un'          # expect: deploy, then root
+ssh assemblage 'id -un; sudo -n id -un'          # expect: deploy, then root
 ```
 
 `sudo -n` is the check that matters, not `sudo -v`: `-n` fails rather than
@@ -143,7 +144,7 @@ sshd -t && systemctl reload ssh
 ```
 
 Firewall. The only ports that need to be open are SSH and the two the proxy
-listens on. `cmsd` is on loopback and must never be reachable from outside —
+listens on. `asmd` is on loopback and must never be reachable from outside —
 it is a TLS-less server that trusts `X-Forwarded-*` from anything in its
 trusted-proxy list, and its listen address is the thing keeping that honest:
 
@@ -155,13 +156,13 @@ ufw --force enable
 ufw status verbose
 ```
 
-Nothing opens 18443. If you ever need to reach `cmsd` directly to debug the
-proxy, tunnel it: `ssh -L 18443:127.0.0.1:18443 cms`.
+Nothing opens 18443. If you ever need to reach `asmd` directly to debug the
+proxy, tunnel it: `ssh -L 18443:127.0.0.1:18443 assemblage`.
 
 ## 4. The directory layout
 
 Nothing in this system creates a directory it was told to use (invariant 19).
-Not `cmsd`, not `cmsdb`, not a test helper. The single exception is the
+Not `asmd`, not `asmdb`, not a test helper. The single exception is the
 computed *interior* of the output tree — `/features/film/2026/03/01/` — which
 `internal/publish/tree.go` creates because it is arithmetic over a category
 path and a URI format rather than a path anybody typed. The root of that tree
@@ -171,20 +172,20 @@ So this list is not boilerplate. Every one of these is a directory the server
 will refuse to start without, by name, in one log line:
 
 ```sh
-sudo install -d -o deploy -g deploy /opt/cms /opt/cms/bin /opt/cms/var \
-    /opt/cms/templates /opt/cms/preview /opt/cms/output /opt/cms/backups
+sudo install -d -o deploy -g deploy /opt/assemblage /opt/assemblage/bin /opt/assemblage/var \
+    /opt/assemblage/templates /opt/assemblage/preview /opt/assemblage/output /opt/assemblage/backups
 ```
 
-| Path | Flag | What lives there |
-|---|---|---|
-| `/opt/cms/bin` | — | `cmsd`, `cmsdb`, `earl` |
-| `/opt/cms/var` | `--db` | `cms.db`, plus SQLite's `-wal` and `-shm` beside it |
-| `/opt/cms/templates` | `--templates` | the content template tree, `<site domain>/<category path>/<element type>.gohtml` |
-| `/opt/cms/preview` | `--preview` | flat, content-addressed `<sha256>.<ext>` |
-| `/opt/cms/output` | `--output` | published files; the interior is created, this root is not |
-| `/opt/cms/backups` | — | see "Backups" below |
+| Path | Flag | What lives there | |---|---|---| | `/opt/assemblage/bin` | — |
+`asmd`, `asmdb`, `earl` | | `/opt/assemblage/var` | `--db` | `assemblage.db`,
+plus SQLite's `-wal` and `-shm` beside it | | `/opt/assemblage/templates` |
+`--templates` | the content template tree, `<site domain>/<category
+path>/<element type>.gohtml` | | `/opt/assemblage/preview` | `--preview` | flat,
+content-addressed `<sha256>.<ext>` | | `/opt/assemblage/output` | `--output` |
+published files; the interior is created, this root is not | |
+`/opt/assemblage/backups` | — | see "Backups" below |
 
-`/opt/cms/var` needs to be writable as a *directory*, not just the file:
+`/opt/assemblage/var` needs to be writable as a *directory*, not just the file:
 SQLite creates the write-ahead log and shared-memory files next to the database.
 The unit's `ReadWritePaths` already says so, and `templates` is deliberately
 absent from it — `internal/render` returns bytes and never writes.
@@ -206,7 +207,7 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
 sudo apt update && sudo apt install -y caddy
 
 sudo install -d -o caddy -g caddy /var/log/caddy
-sudo install -m 644 /opt/cms/deploy/Caddyfile.prod /etc/caddy/Caddyfile
+sudo install -m 644 /opt/assemblage/deploy/Caddyfile.prod /etc/caddy/Caddyfile
 sudo systemctl restart caddy
 ```
 
@@ -214,9 +215,10 @@ The `install -d` is not optional. Caddy creates the log *file* but not the
 directory above it, and the packaged unit runs as `User=caddy` under
 `ProtectSystem=full`. Nor should you run `caddy validate` on that config as
 root: validation loads the config, which opens the log writer, which leaves
-`cms.access.log` owned by `root:root` mode `0600` — and the service then fails
-to start with `permission denied` on a file that exists, in a directory the
-`caddy` user can write. `sudo chown -R caddy:caddy /var/log/caddy` undoes it.
+`assemblage.access.log` owned by `root:root` mode `0600` — and the service then
+fails to start with `permission denied` on a file that exists, in a directory
+the `caddy` user can write. `sudo chown -R caddy:caddy /var/log/caddy` undoes
+it.
 
 The Ubuntu archive has Caddy 2.6.2; the Cloudsmith repository above installs
 2.11.4. Take the newer one — this is the component holding your certificate
@@ -231,17 +233,17 @@ depends on, and both files here already do:
 
 1. **TLS 1.3 or better**, stated explicitly — Caddy's own floor is 1.2.
 2. **The forwarded headers set**: `X-Forwarded-For`, `-Proto`, `-Host`.
-   `cmsd` honours them only from its trusted-proxy CIDRs, which default to
+   `asmd` honours them only from its trusted-proxy CIDRs, which default to
    loopback — correct here, because the proxy is on this droplet.
 3. **`Origin` and `Sec-Fetch-*` passed through unmodified.**
    `net/http.CrossOriginProtection` reads exactly those to decide whether a
    cookie-authenticated write is CSRF. A proxy that rewrites `Origin` breaks
    every form in the UI, and it breaks them as a 403 that looks like a
    permissions bug.
-4. **HSTS and the HTTP→HTTPS redirect belong to the proxy.** `cmsd` emits no
+4. **HSTS and the HTTP→HTTPS redirect belong to the proxy.** `asmd` emits no
    HSTS header of its own and must not be made to.
 
-The proxy will fail to start until `cmsd` is answering — that is fine and
+The proxy will fail to start until `asmd` is answering — that is fine and
 expected at this point in the order; finish the deploy below and reload it.
 
 ## 6. The first deploy
@@ -252,7 +254,7 @@ is `zombiezen.com/go/sqlite`, which is pure Go:
 ```sh
 make check
 make release          # -tags production, into deploy/linux/amd64/
-rsync -av deploy/linux/amd64/ cms:/opt/cms/bin/
+rsync -av deploy/linux/amd64/ assemblage:/opt/assemblage/bin/
 ```
 
 No `--chmod` here. Recent macOS ships openrsync, which reports itself as
@@ -264,29 +266,29 @@ Ship the deploy directory too, so the unit and proxy config on the droplet are
 diffable against the originals:
 
 ```sh
-rsync -av --exclude=linux/ deploy/ cms:/opt/cms/deploy/
+rsync -av --exclude=linux/ deploy/ assemblage:/opt/assemblage/deploy/
 ```
 
 **Verify the interlock before anything else.** On the droplet:
 
 ```sh
-/opt/cms/bin/cmsd version                        # expect: panic, CMS_ENV is not set
-CMS_ENV=production /opt/cms/bin/cmsd version     # expect: the version
+/opt/assemblage/bin/asmd version                        # expect: panic, ASSEMBLAGE_ENV is not set
+ASSEMBLAGE_ENV=production /opt/assemblage/bin/asmd version     # expect: the version
 ```
 
 The first one panicking is the check working. If it prints a version instead,
 the binary was built without `-tags production` — it must not be deployed, and
 the fix is on the Mac, not here.
 
-Create and seed the database. `cmsd` has no `--migrate` flag and no `--create`
-flag, because there is no way to say yes; `cmsdb` is the only thing that
+Create and seed the database. `asmd` has no `--migrate` flag and no `--create`
+flag, because there is no way to say yes; `asmdb` is the only thing that
 touches the schema:
 
 ```sh
-export CMS_ENV=production        # for this shell only, and only for these commands
-/opt/cms/bin/cmsdb init --db /opt/cms/var
-/opt/cms/bin/cmsdb seed --db /opt/cms/var --site-domain www.example.com
-/opt/cms/bin/cmsdb bootstrap admin --db /opt/cms/var \
+export ASSEMBLAGE_ENV=production        # for this shell only, and only for these commands
+/opt/assemblage/bin/asmdb init --db /opt/assemblage/var
+/opt/assemblage/bin/asmdb seed --db /opt/assemblage/var --site-domain www.example.com
+/opt/assemblage/bin/asmdb bootstrap admin --db /opt/assemblage/var \
     --email you@example.com --name "Your Name"
 ```
 
@@ -296,16 +298,16 @@ it to the user it creates. Run them the other way round and the note it prints
 is easy to miss:
 
 ```
-note: there is no "admin" role yet, so no role was assigned; run "cmsdb seed" and try again
+note: there is no "admin" role yet, so no role was assigned; run "asmdb seed" and try again
 ```
 
 "Try again" is not advice that works. `bootstrap admin` is idempotent by
 refusing — a second run with the same email exits non-zero with *a user with
-that email already exists; nothing was changed* — so the role is never
-assigned, and you are left with an administrator who cannot administer
-anything. On a database this fresh the fix is to delete `cms.db` and its `-wal`
-and `-shm` and start the three commands over; on one with content in it, it is
-a role assignment somebody has to write by hand.
+that email already exists; nothing was changed* — so the role is never assigned,
+and you are left with an administrator who cannot administer anything. On a
+database this fresh the fix is to delete `assemblage.db` and its `-wal` and
+`-shm` and start the three commands over; on one with content in it, it is a
+role assignment somebody has to write by hand.
 
 `bootstrap admin` prints a generated password **once**, to stdout. Capture it
 now; there is no second chance and no flag that would let you pass one in
@@ -315,11 +317,12 @@ not the workflow, which the initial migration seeds, because `documents.workflow
 is `NOT NULL` and no document row may exist before a workflow does.
 
 **`--site-domain` is the host your content is published on, not the host this
-CMS is reached at.** They are two different names on a real installation: the
-CMS answers at `cms.example.com`, behind the login, and the site it publishes is
-read at `www.example.com`. `server.public_origin` is the first; this is the
-second. Omitting the flag seeds `assemblage.localhost`, which is a placeholder
-for a developer's machine and wrong on any real server.
+application is reached at.** They are two different names on a real
+installation: the application answers at `assemblage.example.com`, behind the
+login, and the site it publishes is read at `www.example.com`.
+`server.public_origin` is the first; this is the second. Omitting the flag seeds
+`assemblage.localhost`, which is a placeholder for a developer's machine and
+wrong on any real server.
 
 Get it right here if you can, because the domain is also the first path segment
 of the template tree:
@@ -332,25 +335,25 @@ If it is already wrong, it is one command and one directory rename — no
 hand-written SQL, and nothing has to be re-seeded:
 
 ```sh
-earl site list --server https://cms.example.com
-earl site update <uid> --server https://cms.example.com --domain www.example.com
-mv /opt/cms/templates/old.example.com /opt/cms/templates/www.example.com
+earl site list --server https://assemblage.example.com
+earl site update <uid> --server https://assemblage.example.com --domain www.example.com
+mv /opt/assemblage/templates/old.example.com /opt/assemblage/templates/www.example.com
 ```
 
 Rename the directory in the same maintenance window as the row. Nothing in this
 system creates or moves a directory in the template tree (invariant 19), so
 between the two a render finds no template and answers 404.
 
-Do not leave `CMS_ENV` exported in a shell profile. The unit sets it, and that
-is the only place it should live.
+Do not leave `ASSEMBLAGE_ENV` exported in a shell profile. The unit sets it, and
+that is the only place it should live.
 
 ## 7. Start it
 
 ```sh
-sudo install -m 644 /opt/cms/deploy/cms.service /etc/systemd/system/cms.service
+sudo install -m 644 /opt/assemblage/deploy/assemblage.service /etc/systemd/system/assemblage.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now cms
-systemctl status cms
+sudo systemctl enable --now assemblage
+systemctl status assemblage
 sudo systemctl reload caddy        # or: sudo systemctl reload nginx
 ```
 
@@ -359,30 +362,30 @@ sudo systemctl reload caddy        # or: sudo systemctl reload nginx
 Four checks, in the order that isolates a failure to one layer.
 
 ```sh
-# 1. cmsd itself, on the droplet, past the proxy entirely.
+# 1. asmd itself, on the droplet, past the proxy entirely.
 curl -si http://127.0.0.1:18443/healthz | head -1
 
 # 2. Through the proxy, from the Mac. TLS, redirect, HSTS.
-/usr/bin/curl -sI https://cms.mdhenderson.com/healthz
-/usr/bin/curl -sI http://cms.mdhenderson.com/ | grep -i location
+/usr/bin/curl -sI https://assemblage.mdhenderson.com/healthz
+/usr/bin/curl -sI http://assemblage.mdhenderson.com/ | grep -i location
 
 # 3. The development routes are absent. This is the one that matters most.
 /usr/bin/curl -so /dev/null -w '%{http_code}\n' \
-    https://cms.mdhenderson.com/__development/shut-it-down     # expect 404
+    https://assemblage.mdhenderson.com/__development/shut-it-down     # expect 404
 
 # 4. End to end, as a user.
-go run ./cmd/earl login --server https://cms.mdhenderson.com
-go run ./cmd/earl whoami --server https://cms.mdhenderson.com
+go run ./cmd/earl login --server https://assemblage.mdhenderson.com
+go run ./cmd/earl whoami --server https://assemblage.mdhenderson.com
 ```
 
 Check 3 answering anything but 404 means the resolved environment is
 `development`, and every account on the system is open to anyone who guesses an
-email address. `cmsd routes` on the droplet prints the table the running
+email address. `asmd routes` on the droplet prints the table the running
 configuration produces and names the resolved environment, which is the way to
 ask the question directly:
 
 ```sh
-CMS_ENV=production /opt/cms/bin/cmsd routes | head -3
+ASSEMBLAGE_ENV=production /opt/assemblage/bin/asmd routes | head -3
 ```
 
 Use `/usr/bin/curl` when you are looking at TLS. Homebrew's `curl` and
@@ -393,13 +396,13 @@ store, which turns a certificate question into an afternoon.
 
 Two things are state, and they are not the same kind of thing.
 
-`/opt/cms/var/cms.db` is the system of record. Back it up with `cmsdb backup`,
-not `cp` — a copy taken while the write-ahead log is live is a torn database,
-and it will restore without complaining:
+`/opt/assemblage/var/assemblage.db` is the system of record. Back it up with
+`asmdb backup`, not `cp` — a copy taken while the write-ahead log is live is a
+torn database, and it will restore without complaining:
 
 ```sh
-CMS_ENV=production /opt/cms/bin/cmsdb backup \
-  --db /opt/cms/var --to "/opt/cms/backups/cms-$(date +%F).db"
+ASSEMBLAGE_ENV=production /opt/assemblage/bin/asmdb backup \
+  --db /opt/assemblage/var --to "/opt/assemblage/backups/assemblage-$(date +%F).db"
 ```
 
 That is safe against a running server, which is the point: it is `VACUUM INTO`,
@@ -407,36 +410,36 @@ so it takes its own read transaction and reads *through* the write-ahead log
 rather than around it. Nothing has to be stopped, and the snapshot comes out
 compacted.
 
-`sqlite3` is deliberately not used and deliberately not installed. `cmsdb` is
-already here, already knows the database is `DIR/cms.db`, and already refuses
-to open one whose `application_id` is not `ASM0`; pointed at the wrong
+`sqlite3` is deliberately not used and deliberately not installed. `asmdb` is
+already here, already knows the database is `DIR/assemblage.db`, and already
+refuses to open one whose `application_id` is not `ASM0`; pointed at the wrong
 directory, `sqlite3 .backup` writes a zero-byte file and exits 0.
 
-`cmsdb backup` refuses an existing `--to` unless given `--overwrite`, and it
+`asmdb backup` refuses an existing `--to` unless given `--overwrite`, and it
 verifies what it wrote before giving it the name asked for — so a file in
-`/opt/cms/backups` is a backup that opened and passed `integrity_check`, not
-just a file that appeared. Check an older one whenever you want to:
+`/opt/assemblage/backups` is a backup that opened and passed `integrity_check`,
+not just a file that appeared. Check an older one whenever you want to:
 
 ```sh
-CMS_ENV=production /opt/cms/bin/cmsdb check --file /opt/cms/backups/cms-2026-09-09.db
+ASSEMBLAGE_ENV=production /opt/assemblage/bin/asmdb check --file /opt/assemblage/backups/assemblage-2026-09-09.db
 ```
 
 Get them off the droplet: a backup on the same disk as the thing it is backing
 up is a copy, not a backup. Restoring is in `README.md`, under "Deploying a new
 version" — a `cp` with the service stopped, and deliberately not a command.
 
-`/opt/cms/output` is the published tree, and it is reproducible — every file in
-it is claimed by a row in `published_resources`. Back it up if regenerating it
-is slower than restoring it, which it will be once the site is large. Either
-way, `cmsdb check --output /opt/cms/output` is what reconciles the two, and it
-reports the two opposite orphans — rows whose file is gone, files no row claims
-— separately, because they are different failures.
+`/opt/assemblage/output` is the published tree, and it is reproducible — every
+file in it is claimed by a row in `published_resources`. Back it up if
+regenerating it is slower than restoring it, which it will be once the site is
+large. Either way, `asmdb check --output /opt/assemblage/output` is what
+reconciles the two, and it reports the two opposite orphans — rows whose file is
+gone, files no row claims — separately, because they are different failures.
 
-`/opt/cms/preview` is a cache. Content-addressed, regenerated on demand, and
-not worth a backup.
+`/opt/assemblage/preview` is a cache. Content-addressed, regenerated on demand,
+and not worth a backup.
 
-`cmsdb vacuum` rewrites the whole file in one write transaction, so it wants
+`asmdb vacuum` rewrites the whole file in one write transaction, so it wants
 the database to itself: run it with the service stopped, or accept that it will
-contend with the server for the write lock. `cmsdb backup` and `cmsdb check`
+contend with the server for the write lock. `asmdb backup` and `asmdb check`
 only read — they take a reader and never begin a write transaction — so neither
 needs an outage.

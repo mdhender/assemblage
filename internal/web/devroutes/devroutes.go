@@ -13,9 +13,9 @@
 // gets worked around. A worked-around guard protects nothing.
 //
 // So the resolved environment is the only switch, and the footgun that follows
-// is accepted knowingly: anyone who exports CMS_ENV=development on a production
-// server exposes a complete authentication bypass. What remains is three
-// layers, and the last two exist precisely because the first can be
+// is accepted knowingly: anyone who exports ASSEMBLAGE_ENV=development on a
+// production server exposes a complete authentication bypass. What remains is
+// three layers, and the last two exist precisely because the first can be
 // misconfigured.
 //
 //  1. The route builder calls Register only when the resolved environment is

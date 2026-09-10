@@ -55,8 +55,8 @@ func TestResolveDefaultsToProduction(t *testing.T) {
 	}
 }
 
-// TestResolvePrecedence walks the chain from DESIGN.md 14: --env, then CMS_ENV,
-// then the config file, then the default.
+// TestResolvePrecedence walks the chain from DESIGN.md 14: --env, then
+// ASSEMBLAGE_ENV, then the config file, then the default.
 func TestResolvePrecedence(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -86,8 +86,8 @@ func TestResolvePrecedence(t *testing.T) {
 // TestResolveSetButMisspelledDoesNotFallThrough is the subtle half of the
 // precedence rule. A higher source that supplies an unrecognized value still
 // wins, and resolves to production. If it fell through instead, a typo in
-// CMS_ENV would hand control to a config file — which is how a typo unlocks the
-// thing the typo was meant to gate.
+// ASSEMBLAGE_ENV would hand control to a config file — which is how a typo
+// unlocks the thing the typo was meant to gate.
 func TestResolveSetButMisspelledDoesNotFallThrough(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -133,7 +133,7 @@ func TestResolveReportsRawForTheBanner(t *testing.T) {
 	}
 }
 
-func TestFromEnvReadsCMSEnv(t *testing.T) {
+func TestFromEnvReadsasmEnv(t *testing.T) {
 	t.Setenv(EnvVar, "development")
 	if got := FromEnv(); got != "development" {
 		t.Errorf("FromEnv() = %q, want %q", got, "development")

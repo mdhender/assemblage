@@ -15,8 +15,8 @@ import (
 )
 
 // TestVerifyWithoutTag is the untagged half of PLAN.md M0 acceptance 14: an
-// ordinary binary is fine with CMS_ENV unset and with development, and must
-// refuse to run with production.
+// ordinary binary is fine with ASSEMBLAGE_ENV unset and with development, and
+// must refuse to run with production.
 //
 // The asymmetry is intentional. The ordinary binary rejects only the one value
 // it must never see, because requiring developers to export anything in order
@@ -79,7 +79,7 @@ func TestNoInitFunction(t *testing.T) {
 // EnvVarForTest names the variable Verify reads. It is duplicated from
 // internal/config on purpose: this package imports nothing from the repository
 // and must not start now (see the package doc).
-const EnvVarForTest = "CMS_ENV"
+const EnvVarForTest = "ASSEMBLAGE_ENV"
 
 func assertPanic(t *testing.T, want bool) {
 	t.Helper()
@@ -89,7 +89,7 @@ func assertPanic(t *testing.T, want bool) {
 		return
 	}()
 	if got != want {
-		t.Fatalf("Verify() panicked = %v, want %v (CMS_ENV=%q, present=%v)",
+		t.Fatalf("Verify() panicked = %v, want %v (ASSEMBLAGE_ENV=%q, present=%v)",
 			got, want, os.Getenv(EnvVarForTest), envPresent(EnvVarForTest))
 	}
 }

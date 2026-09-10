@@ -23,16 +23,16 @@ import (
 // refuse to start. They live in cmd/asmd because that is where the harness
 // that builds and runs the binaries already is.
 
-// TestCmsdb covers PLAN.md M1 acceptance 1, 2, and 5.
-func TestCmsdb(t *testing.T) {
+// TestAsmdb covers PLAN.md M1 acceptance 1, 2, and 5.
+func TestAsmdb(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds three binaries")
 	}
 	bin := buildCommands(t, t.TempDir())
 	asmdb := bin["asmdb"]
 
-	// Acceptance 1: init creates DIR/cms.db, and running it twice is safe and
-	// says "already initialised".
+	// Acceptance 1: init creates DIR/assemblage.db, and running it twice is safe
+	// and says "already initialised".
 	t.Run("init", func(t *testing.T) {
 		dir := t.TempDir()
 
@@ -40,8 +40,8 @@ func TestCmsdb(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("init exited %d\nstderr: %s", code, stderr)
 		}
-		if _, err := os.Stat(filepath.Join(dir, "cms.db")); err != nil {
-			t.Fatalf("cms.db was not created: %v", err)
+		if _, err := os.Stat(filepath.Join(dir, "assemblage.db")); err != nil {
+			t.Fatalf("assemblage.db was not created: %v", err)
 		}
 		if !strings.Contains(stdout, "initialised") {
 			t.Errorf("init printed %q", stdout)
@@ -144,13 +144,13 @@ func TestCmsdb(t *testing.T) {
 	})
 }
 
-// TestCmsdRefusesToStart is PLAN.md M1 acceptance 10, 11, 12, and 13.
+// TestAsmdRefusesToStart is PLAN.md M1 acceptance 10, 11, 12, and 13.
 //
 // Every case asserts three things: a non-zero exit, nothing listening, and a
 // message naming the expected value, the actual value, and the path. The last
 // is not decoration — these are the messages an operator reads at three in the
 // morning.
-func TestCmsdRefusesToStart(t *testing.T) {
+func TestAsmdRefusesToStart(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds three binaries")
 	}
@@ -171,9 +171,9 @@ func TestCmsdRefusesToStart(t *testing.T) {
 	}{
 		{
 			// Acceptance 10.
-			name:  "no cms.db in the directory",
+			name:  "no assemblage.db in the directory",
 			setup: func(t *testing.T) string { return t.TempDir() },
-			want:  []string{"cms.db", "does not exist", "asmdb init"},
+			want:  []string{"assemblage.db", "does not exist", "asmdb init"},
 		},
 		{
 			// Acceptance 2, for asmd.
@@ -189,7 +189,7 @@ func TestCmsdRefusesToStart(t *testing.T) {
 			name: "a zero-length file",
 			setup: func(t *testing.T) string {
 				dir := t.TempDir()
-				if err := os.WriteFile(filepath.Join(dir, "cms.db"), nil, 0o600); err != nil {
+				if err := os.WriteFile(filepath.Join(dir, "assemblage.db"), nil, 0o600); err != nil {
 					t.Fatal(err)
 				}
 				return dir
@@ -202,7 +202,7 @@ func TestCmsdRefusesToStart(t *testing.T) {
 			name: "another program's database",
 			setup: func(t *testing.T) string {
 				dir := t.TempDir()
-				stampForeign(t, filepath.Join(dir, "cms.db"), 0x4f544852)
+				stampForeign(t, filepath.Join(dir, "assemblage.db"), 0x4f544852)
 				return dir
 			},
 			want: []string{"application_id", "0x4f544852", "0x41534d30"},
@@ -216,7 +216,7 @@ func TestCmsdRefusesToStart(t *testing.T) {
 				return dir
 			},
 			want: []string{
-				"cms.db",
+				"assemblage.db",
 				fmt.Sprintf("user_version is %d", migrate.Count()-1),
 				fmt.Sprintf("expected %d", migrate.Count()),
 				"asmdb migrate up",
@@ -230,11 +230,11 @@ func TestCmsdRefusesToStart(t *testing.T) {
 				if _, stderr, code := run(t, bin["asmdb"], nil, "init", "--db", dir); code != 0 {
 					t.Fatalf("init: %s", stderr)
 				}
-				setVersion(t, filepath.Join(dir, "cms.db"), int32(migrate.Count()+1))
+				setVersion(t, filepath.Join(dir, "assemblage.db"), int32(migrate.Count()+1))
 				return dir
 			},
 			want: []string{
-				"cms.db",
+				"assemblage.db",
 				fmt.Sprintf("user_version is %d", migrate.Count()+1),
 				fmt.Sprintf("expected %d", migrate.Count()),
 			},
@@ -242,7 +242,7 @@ func TestCmsdRefusesToStart(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := tc.setup(t)
-			before := versionOf(t, filepath.Join(dir, "cms.db"))
+			before := versionOf(t, filepath.Join(dir, "assemblage.db"))
 
 			_, stderr, code := run(t, bin["asmd"], nil,
 				"serve", "--db", dir, "--addr", addr, "--timeout", "5s")
@@ -263,17 +263,17 @@ func TestCmsdRefusesToStart(t *testing.T) {
 			}
 			// Acceptance 12: the version afterwards is untouched. A server
 			// that migrated and then failed for another reason must not pass.
-			if after := versionOf(t, filepath.Join(dir, "cms.db")); after != before {
+			if after := versionOf(t, filepath.Join(dir, "assemblage.db")); after != before {
 				t.Errorf("user_version went from %d to %d; asmd never migrates (invariant 20)", before, after)
 			}
 		})
 	}
 }
 
-// TestCmsdHasNoWayToSayYes is invariant 20 spelled as a flag check. asmd does
+// TestAsmdHasNoWayToSayYes is invariant 20 spelled as a flag check. asmd does
 // not gain a --migrate flag, a --create flag, or any other way to repair what
 // it found.
-func TestCmsdHasNoWayToSayYes(t *testing.T) {
+func TestAsmdHasNoWayToSayYes(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds three binaries")
 	}
@@ -313,11 +313,11 @@ func reservedAddr(t *testing.T) string {
 // only exercise "--to" gets at the process level.
 func initTo(t *testing.T, asmdb, dir string, n int) {
 	t.Helper()
-	stampEmpty(t, filepath.Join(dir, "cms.db"))
+	stampEmpty(t, filepath.Join(dir, "assemblage.db"))
 	if _, stderr, code := run(t, asmdb, nil, "migrate", "up", "--db", dir, "--to", fmt.Sprint(n)); code != 0 {
 		t.Fatalf("migrate up --to %d: %s", n, stderr)
 	}
-	if got := versionOf(t, filepath.Join(dir, "cms.db")); got != int32(n) {
+	if got := versionOf(t, filepath.Join(dir, "assemblage.db")); got != int32(n) {
 		t.Fatalf("migrate up --to %d left user_version at %d", n, got)
 	}
 }
@@ -391,12 +391,12 @@ func versionOf(t *testing.T, path string) int32 {
 	return v
 }
 
-// TestPathIsTheDirectoryPlusTheConstant is DESIGN.md 13.1 as an assertion:
-// --db names a directory and the file inside it is always cms.db, so --db
+// TestPathIsTheDirectoryPlusTheConstant is DESIGN.md 13.1 as an assertion: --db
+// names a directory and the file inside it is always assemblage.db, so --db
 // cannot address two different files depending on which command was typed.
 func TestPathIsTheDirectoryPlusTheConstant(t *testing.T) {
 	dir := t.TempDir()
-	if got, want := store.Path(dir), filepath.Join(dir, "cms.db"); got != want {
+	if got, want := store.Path(dir), filepath.Join(dir, "assemblage.db"); got != want {
 		t.Errorf("store.Path(%q) = %q, want %q", dir, got, want)
 	}
 }

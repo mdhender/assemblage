@@ -1,17 +1,17 @@
-# systemd unit for asmd. EXAMPLE — copy to /etc/systemd/system/cms.service on
+# systemd unit for asmd. EXAMPLE — copy to /etc/systemd/system/assemblage.service on
 # the droplet and edit the two site-specific lines (--public-origin, and the
 # paths if you did not use the layout in PROVISIONING.md).
 #
 # Install:
-#     sudo install -m 644 /opt/cms/deploy/cms.service /etc/systemd/system/cms.service
+#     sudo install -m 644 /opt/assemblage/deploy/assemblage.service /etc/systemd/system/assemblage.service
 #     sudo systemctl daemon-reload
-#     sudo systemctl enable --now cms
+#     sudo systemctl enable --now assemblage
 #
 # This file is not read from the repository at runtime. It is committed so that
 # the unit under /etc/systemd/system is diffable against a known original.
 
 [Unit]
-Description=assemblage CMS (asmd)
+Description=assemblage (asmd)
 Documentation=https://github.com/mdhender/assemblage
 After=network-online.target
 Wants=network-online.target
@@ -21,17 +21,17 @@ Wants=network-online.target
 Type=exec
 User=deploy
 Group=deploy
-WorkingDirectory=/opt/cms
+WorkingDirectory=/opt/assemblage
 
-# CMS_ENV carries the whole weight of the development-route gate, and it is
+# ASSEMBLAGE_ENV carries the whole weight of the development-route gate, and it is
 # also half of the build/environment interlock: a binary built with
 # -tags production panics at startup unless this is exactly "production".
 # Set it here and nowhere else. Never in a shell profile, never in /etc/environment.
 #
-# CMS_ENV=development on this machine is a complete authentication bypass:
+# ASSEMBLAGE_ENV=development on this machine is a complete authentication bypass:
 # it registers GET /__development/log-me-in/{email}, which logs anyone in as
 # anyone. See docs/DESIGN.md 11, "Development affordances".
-Environment=CMS_ENV=production
+Environment=ASSEMBLAGE_ENV=production
 
 # Every directory named here must already exist. Nothing in this system creates
 # a directory (invariant 19) -- not asmd, not asmdb -- with the single exception
@@ -39,7 +39,7 @@ Environment=CMS_ENV=production
 # missing directory is a startup failure that names the flag, which is the
 # intended behaviour: it is better than a server that silently publishes nowhere.
 #
-# --db names the directory; the database inside it is always cms.db. asmd never
+# --db names the directory; the database inside it is always assemblage.db. asmd never
 # creates it and never migrates it. See "Deploying a new version" in
 # deploy/README.md for where `asmdb migrate up` goes.
 #
@@ -55,13 +55,13 @@ Environment=CMS_ENV=production
 #
 # --timeout is omitted deliberately. It defaults to 0, meaning never; a server
 # that shuts itself down after a duration is a development affordance.
-ExecStart=/opt/cms/bin/asmd serve \
-    --db /opt/cms/var \
+ExecStart=/opt/assemblage/bin/asmd serve \
+    --db /opt/assemblage/var \
     --addr 127.0.0.1:18443 \
-    --public-origin https://cms.mdhenderson.com \
-    --templates /opt/cms/templates \
-    --preview /opt/cms/preview \
-    --output /opt/cms/output \
+    --public-origin https://assemblage.mdhenderson.com \
+    --templates /opt/assemblage/templates \
+    --preview /opt/assemblage/preview \
+    --output /opt/assemblage/output \
     --workers 2
 
 Restart=on-failure
@@ -84,12 +84,12 @@ SyslogIdentifier=asmd
 
 # --- Hardening -------------------------------------------------------------
 # ProtectSystem=strict makes the whole filesystem read-only, so every directory
-# asmd writes to has to be named. /opt/cms/var holds cms.db plus the -wal and
+# asmd writes to has to be named. /opt/assemblage/var holds assemblage.db plus the -wal and
 # -shm files SQLite creates beside it, so the directory itself needs write
-# permission, not just the file. /opt/cms/templates is deliberately absent:
+# permission, not just the file. /opt/assemblage/templates is deliberately absent:
 # internal/render returns bytes and never writes.
 ProtectSystem=strict
-ReadWritePaths=/opt/cms/var /opt/cms/preview /opt/cms/output
+ReadWritePaths=/opt/assemblage/var /opt/assemblage/preview /opt/assemblage/output
 ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes

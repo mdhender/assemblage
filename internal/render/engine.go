@@ -196,11 +196,11 @@ func (e *Engine) template(p string) (*htmltemplate.Template, error) {
 // and adding a second needs a reason.
 //
 // "raw" is the escape hatch html/template is designed to have. A block field
-// holds a paragraph "possibly with markup" (DESIGN.md 5.2), and a renderer
-// that escapes it renders the markup as visible angle brackets, which makes
-// the whole package useless for the thing it exists to do. What makes it
-// acceptable is who writes the content: an editor holding Edit on the
-// document, inside an authenticated system, which is the same trust every CMS
+// holds a paragraph "possibly with markup" (DESIGN.md 5.2), and a renderer that
+// escapes it renders the markup as visible angle brackets, which makes the
+// whole package useless for the thing it exists to do. What makes it acceptable
+// is who writes the content: an editor holding Edit on the document, inside an
+// authenticated system, which is the same trust every content management system
 // extends to the people who use it. What makes it survivable is that a preview
 // is served with a sandboxing Content-Security-Policy (see Scratch), so a
 // script that arrives this way runs in an opaque origin and cannot reach the

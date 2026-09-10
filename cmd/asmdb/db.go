@@ -20,11 +20,11 @@ func newInitCmd() *cobra.Command {
 	var dir string
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Create DIR/cms.db and apply every migration",
-		Long: "Create DIR/cms.db and apply every migration.\n\n" +
+		Short: "Create DIR/assemblage.db and apply every migration",
+		Long: "Create DIR/assemblage.db and apply every migration.\n\n" +
 			"DIR must already exist: nothing in this system creates a directory,\n" +
-			"because a mistyped path that creates one leaves an empty CMS that\n" +
-			"looks exactly like the real one.",
+			"because a mistyped path that creates one leaves an empty assemblage\n" +
+			"that looks exactly like the real one.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
@@ -141,7 +141,7 @@ func newCheckCmd() *cobra.Command {
 		Use:   "check",
 		Short: "Check integrity, foreign keys, leases, and orphaned resources",
 		Long: "Check integrity, foreign keys, leases, and orphaned resources.\n\n" +
-			"--db DIR checks DIR/cms.db, the database this system serves from.\n" +
+			"--db DIR checks DIR/assemblage.db, the database this system serves from.\n" +
 			"--file FILE checks a database file under any name, which is what a\n" +
 			"backup is: verifying one used to mean moving it into a directory\n" +
 			"under the expected name first.",
@@ -158,7 +158,7 @@ func newCheckCmd() *cobra.Command {
 			now := clock.Real{}.Now()
 
 			// db stays nil for --file. A file under any name is read without
-			// the DIR/cms.db convention and without opening a writer, and
+			// the DIR/assemblage.db convention and without opening a writer, and
 			// nothing else this command does applies to one: reconciling
 			// published_resources against an output tree is a question about
 			// the live system rather than about a snapshot of it, which is why
@@ -253,7 +253,7 @@ func newCheckCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&dir, "db", "", "directory holding cms.db; it must already exist")
+	cmd.Flags().StringVar(&dir, "db", "", "directory holding assemblage.db; it must already exist")
 	cmd.Flags().StringVar(&file, "file", "",
 		"database file to check under any name, such as a backup; read-only")
 	cmd.MarkFlagsMutuallyExclusive("db", "file")

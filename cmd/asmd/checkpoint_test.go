@@ -16,9 +16,9 @@ import (
 	"github.com/mdhender/assemblage/internal/migrate"
 )
 
-// These are #11 at the process level: a graceful shutdown left cms.db-wal on
-// disk, so a backup of cms.db alone silently lost everything committed since
-// the last automatic checkpoint.
+// These are #11 at the process level: a graceful shutdown left
+// assemblage.db-wal on disk, so a backup of assemblage.db alone silently lost
+// everything committed since the last automatic checkpoint.
 //
 // There is one subtest per shutdown route because invariant 17's "one path" is
 // the claim being relied on — a fix that only covered SIGTERM would be a
@@ -67,7 +67,7 @@ func TestAGracefulShutdownCheckpointsTheWriteAheadLog(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			const email, password = "admin@example.com", "correct horse battery staple"
 			dir := bootstrapped(t, bin["asmdb"], email, password)
-			wal := filepath.Join(dir, "cms.db-wal")
+			wal := filepath.Join(dir, "assemblage.db-wal")
 
 			proc := start(t, bin["asmd"], nil, "serve", "--db", dir,
 				"--env", "development", "--addr", "127.0.0.1:0", "--timeout", tc.timeout)
@@ -77,7 +77,7 @@ func TestAGracefulShutdownCheckpointsTheWriteAheadLog(t *testing.T) {
 			// would pass this test without the fix.
 			token := devLogins(t, proc, email, 25)
 			if before := walSize(t, wal); before <= 0 {
-				t.Fatalf("cms.db-wal is %d bytes while the server is running; the test is not reproducing the condition", before)
+				t.Fatalf("assemblage.db-wal is %d bytes while the server is running; the test is not reproducing the condition", before)
 			}
 
 			if tc.stop != nil {
@@ -89,7 +89,7 @@ func TestAGracefulShutdownCheckpointsTheWriteAheadLog(t *testing.T) {
 
 			// Acceptance 1: the log is gone or empty.
 			if got := walSize(t, wal); got > 0 {
-				t.Errorf("cms.db-wal is %d bytes after a graceful shutdown, want absent or empty\nstderr: %s",
+				t.Errorf("assemblage.db-wal is %d bytes after a graceful shutdown, want absent or empty\nstderr: %s",
 					got, proc.stderr())
 			}
 
@@ -103,7 +103,7 @@ func TestAGracefulShutdownCheckpointsTheWriteAheadLog(t *testing.T) {
 				t.Errorf("stderr does not report the checkpoint result\nstderr: %s", proc.stderr())
 			}
 
-			// Acceptance 1, the part the rest of it is for: cms.db on its own
+			// Acceptance 1, the part the rest of it is for: assemblage.db on its own
 			// is a complete database. This is the backup deploy/README.md
 			// asks an operator to take, and the session issued before the
 			// shutdown has to still be in it.
@@ -127,7 +127,7 @@ func TestAKilledServerLeavesARecoverableDatabase(t *testing.T) {
 
 	const email, password = "admin@example.com", "correct horse battery staple"
 	dir := bootstrapped(t, bin["asmdb"], email, password)
-	wal := filepath.Join(dir, "cms.db-wal")
+	wal := filepath.Join(dir, "assemblage.db-wal")
 
 	proc := start(t, bin["asmd"], nil, "serve", "--db", dir,
 		"--env", "development", "--addr", "127.0.0.1:0", "--timeout", "120s")
@@ -143,20 +143,20 @@ func TestAKilledServerLeavesARecoverableDatabase(t *testing.T) {
 	// The log survives, which is the whole point: it is the only copy of
 	// those commits, and nothing has had a chance to move them.
 	if got := walSize(t, wal); got <= 0 {
-		t.Fatalf("cms.db-wal is %d bytes after SIGKILL, want the log left for the next open to replay", got)
+		t.Fatalf("assemblage.db-wal is %d bytes after SIGKILL, want the log left for the next open to replay", got)
 	}
 
-	// And the next opener recovers it. This one is the real database rather
-	// than a copy of cms.db alone, because after a kill the log is part of it.
+	// And the next opener recovers it. This one is the real database rather than a
+	// copy of assemblage.db alone, because after a kill the log is part of it.
 	checkPasses(t, bin["asmdb"], dir)
 	servesTheSession(t, bin["asmd"], dir, token)
 }
 
-// TestEveryCmsdbCommandCheckpointsOnItsWayOut is #11 acceptance 2. They all
+// TestEveryasmdbCommandCheckpointsOnItsWayOut is #11 acceptance 2. They all
 // run the same store.Close, so this is one assertion repeated rather than six
 // different ones — which is the point: the checkpoint is in the close, not in
 // each command.
-func TestEveryCmsdbCommandCheckpointsOnItsWayOut(t *testing.T) {
+func TestEveryasmdbCommandCheckpointsOnItsWayOut(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds three binaries")
 	}
@@ -164,9 +164,9 @@ func TestEveryCmsdbCommandCheckpointsOnItsWayOut(t *testing.T) {
 	asmdb := bin["asmdb"]
 
 	dir := initDB(t, asmdb)
-	wal := filepath.Join(dir, "cms.db-wal")
+	wal := filepath.Join(dir, "assemblage.db-wal")
 	if got := walSize(t, wal); got > 0 {
-		t.Errorf("asmdb init left a %d-byte cms.db-wal", got)
+		t.Errorf("asmdb init left a %d-byte assemblage.db-wal", got)
 	}
 
 	// In the order the commands themselves require: seed writes the roles
@@ -189,7 +189,7 @@ func TestEveryCmsdbCommandCheckpointsOnItsWayOut(t *testing.T) {
 				t.Fatalf("asmdb %s exited %d\nstdout: %s\nstderr: %s", tc.name, code, stdout, stderr)
 			}
 			if got := walSize(t, wal); got > 0 {
-				t.Errorf("asmdb %s left a %d-byte cms.db-wal, want absent or empty", tc.name, got)
+				t.Errorf("asmdb %s left a %d-byte assemblage.db-wal, want absent or empty", tc.name, got)
 			}
 		})
 	}
@@ -220,16 +220,16 @@ func devLogins(t *testing.T, p *process, email string, n int) string {
 	return token
 }
 
-// backupOf copies cms.db and nothing else into a directory of its own, which
-// is the backup deploy/README.md asks for.
+// backupOf copies assemblage.db and nothing else into a directory of its own,
+// which is the backup deploy/README.md asks for.
 func backupOf(t *testing.T, dir string) string {
 	t.Helper()
 	backup := t.TempDir()
-	b, err := os.ReadFile(filepath.Join(dir, "cms.db"))
+	b, err := os.ReadFile(filepath.Join(dir, "assemblage.db"))
 	if err != nil {
-		t.Fatalf("reading cms.db: %v", err)
+		t.Fatalf("reading assemblage.db: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(backup, "cms.db"), b, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(backup, "assemblage.db"), b, 0o600); err != nil {
 		t.Fatalf("writing the copy: %v", err)
 	}
 	return backup
@@ -254,7 +254,7 @@ func checkPasses(t *testing.T, asmdb, dir string) {
 // servesTheSession starts a asmd against dir and asserts that the session
 // issued before the shutdown is still there. It is the strongest form of
 // "the file is complete": a row committed to the log and never moved into
-// cms.db would be a 401 here.
+// assemblage.db would be a 401 here.
 func servesTheSession(t *testing.T, asmd, dir, token string) {
 	t.Helper()
 	proc := start(t, asmd, nil, "serve", "--db", dir,

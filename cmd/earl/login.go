@@ -136,7 +136,7 @@ func devLogin(ctx context.Context, client *Client, email string) (loginResponse,
 		if errors.As(err, &p) && p.Status == http.StatusNotFound {
 			return loginResponse{}, fmt.Errorf(
 				"%s has no development login route, or no user %q.\n"+
-					"The route exists only when the server runs with --env development or CMS_ENV=development;\n"+
+					"The route exists only when the server runs with --env development or ASSEMBLAGE_ENV=development;\n"+
 					"the user must already exist -- run \"asmdb bootstrap admin\" first.",
 				client.Server, email)
 		}
